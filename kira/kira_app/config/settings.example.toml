@@ -1,0 +1,14 @@
+[kira]
+environment = "development"
+log_level = "INFO"
+
+[paths]
+data_dir = "data"
+log_dir = "logs"
+prompts_dir = "prompts"
+knowledge_dir = "knowledge"
+voice_dir = "data/voice"
+audio_input_dir = "data/audio/input"
+audio_settings_path = "data/audio/settings.json"
+ha_live_events_path = "data/homeassistant/live_events.json"
+ha_event_filters_path = "config/ha_event_filters.yaml"

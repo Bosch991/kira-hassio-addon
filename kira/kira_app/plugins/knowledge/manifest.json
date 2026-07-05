@@ -1,0 +1,8 @@
+{
+  "name": "knowledge",
+  "version": "1.0.0",
+  "description": "Markdown knowledge base and prompt context integration.",
+  "author": "Kira Project",
+  "dependencies": [],
+  "config_file": "knowledge.yaml"
+}

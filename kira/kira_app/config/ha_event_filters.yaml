@@ -1,0 +1,30 @@
+# Kira Home Assistant live event filters.
+#
+# This file intentionally uses a small YAML subset: booleans and lists.
+# Kira can read it without pulling in an extra YAML dependency.
+
+ignored_attribute_only_changes: true
+
+ignored_domains:
+  - sun
+  - zone
+
+ignored_entity_patterns:
+  - sensor.time
+  - sensor.date
+  - sensor.uptime
+  - sensor.weather
+  - weather.
+  - _battery
+  - battery_
+  - batterie
+
+important_terms:
+  - doorbell
+  - klingel
+  - waschmaschine
+  - washing_machine
+  - drucker
+  - printer
+  - 3d
+  - automation

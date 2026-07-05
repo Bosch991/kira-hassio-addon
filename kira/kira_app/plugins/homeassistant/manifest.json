@@ -1,0 +1,8 @@
+{
+  "name": "homeassistant",
+  "version": "1.0.0",
+  "description": "Home Assistant REST and live event integration.",
+  "author": "Kira Project",
+  "dependencies": [],
+  "config_file": "homeassistant.yaml"
+}

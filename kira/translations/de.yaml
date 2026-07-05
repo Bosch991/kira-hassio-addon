@@ -1,0 +1,28 @@
+configuration:
+  openai_api_key:
+    name: OpenAI API Key
+    description: API-Key fuer freie Kira-Gesprae und Assist-Antworten.
+  openai_model:
+    name: OpenAI Modell
+    description: Modellname, den Kira fuer Antworten nutzt.
+  kira_api_token:
+    name: Kira API Token
+    description: Bearer Token fuer Home Assistant Assist POST /assist.
+  elevenlabs_api_key:
+    name: ElevenLabs API Key
+    description: Optionaler API-Key fuer Kira-Sprachausgabe.
+  elevenlabs_voice_id:
+    name: ElevenLabs Voice ID
+    description: Stimme, die Kira fuer TTS nutzt.
+  default_media_player:
+    name: Standard media_player
+    description: Optionales Home-Assistant-Ausgabegeraet fuer Kira-Sprachausgabe.
+  media_base_url:
+    name: Media Base URL
+    description: Erreichbare URL des Kira-Mediaservers, z. B. http://HA-IP:8765.
+  log_level:
+    name: Log Level
+    description: Detailgrad der lokalen Kira-Logs.
+  live_notifications:
+    name: Live Events
+    description: Aktiviert vorbereitete Home-Assistant-Live-Event-Hinweise.

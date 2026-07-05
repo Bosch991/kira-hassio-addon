@@ -1,0 +1,67 @@
+allowed_domains:
+  - light
+  - media_player
+  - fan
+  - scene
+  - switch
+  - cover
+  - climate
+  - automation
+  - script
+
+allowed_rooms:
+  - kueche
+  - esszimmer
+  - wohnzimmer_tv
+  - badezimmer
+  - kinderzimmer
+  - schlafzimmer
+  - arbeit
+
+allowed_entities: []
+
+blocked_entities: []
+
+low_risk_auto_execute:
+  - light.turn_on
+  - light.turn_off
+  - light.toggle
+  - media_player.volume_set
+  - media_player.volume_up
+  - media_player.volume_down
+  - media_player.media_stop
+  - fan.turn_on
+  - fan.turn_off
+
+require_confirm:
+  - switch.turn_on
+  - switch.turn_off
+  - cover.open_cover
+  - cover.close_cover
+  - climate.set_temperature
+  - automation.turn_off
+  - script.turn_on
+
+always_block:
+  - lock.unlock
+  - alarm_control_panel.alarm_disarm
+
+risk_levels:
+  low:
+    - light
+    - media_player
+    - fan
+  medium:
+    - switch
+    - cover
+    - climate
+    - automation
+    - script
+  high:
+    - lock
+    - alarm_control_panel
+
+confirm_rules:
+  require_confirm_for_multiple_rooms: true
+  require_confirm_for_risky_domains: true
+  require_confirm_over_entity_count: 5

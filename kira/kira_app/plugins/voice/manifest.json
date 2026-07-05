@@ -1,0 +1,8 @@
+{
+  "name": "voice",
+  "version": "1.0.0",
+  "description": "Voice generation, audio routing, recording, and STT integration.",
+  "author": "Kira Project",
+  "dependencies": ["openai"],
+  "config_file": "voice.yaml"
+}

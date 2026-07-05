@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=70.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kira-assistant"
+version = "1.5.0"
+description = "Local-first personal AI assistant foundation."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+  { name = "Kira Project" }
+]
+dependencies = [
+  "pydantic==2.11.7",
+  "pydantic-settings==2.10.1",
+  "openai==1.93.0",
+  "httpx==0.28.1",
+  "rich==14.0.0",
+  "sounddevice==0.5.1",
+  "soundfile==0.13.1",
+  "websockets==15.0.1",
+  "fastapi==0.115.14",
+  "uvicorn==0.35.0",
+  "PyYAML==6.0.2",
+  "PySide6==6.9.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black==25.1.0",
+  "pytest==8.4.1",
+  "ruff==0.12.2",
+]
+
+[project.scripts]
+kira = "kira.core.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "A",
+  "B",
+  "C4",
+  "D",
+  "E",
+  "F",
+  "I",
+  "N",
+  "UP",
+  "W",
+]
+ignore = [
+  "D100",
+  "D104",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]

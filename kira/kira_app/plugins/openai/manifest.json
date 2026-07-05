@@ -1,0 +1,8 @@
+{
+  "name": "openai",
+  "version": "1.0.0",
+  "description": "OpenAI chat and speech-to-text provider integration.",
+  "author": "Kira Project",
+  "dependencies": [],
+  "config_file": "openai.yaml"
+}
