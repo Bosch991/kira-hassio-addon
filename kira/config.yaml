@@ -2,7 +2,7 @@ name: Kira
 version: "1.5.0"
 slug: kira
 description: Local-first Kira Assist server for Home Assistant OS
-url: "https://local/kira"
+url: "https://github.com/Bosch991/kira-hassio-addon"
 arch:
   - aarch64
   - amd64
