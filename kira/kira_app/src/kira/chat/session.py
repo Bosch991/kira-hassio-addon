@@ -221,6 +221,9 @@ class ChatSession:
                 if parsed.command is ChatCommand.BACKUP:
                     self._backup()
                     continue
+                if parsed.command is ChatCommand.BRIEFING:
+                    self._briefing(parsed.text)
+                    continue
                 if parsed.command is ChatCommand.EXPORT:
                     self._export(parsed.text)
                     continue
@@ -310,6 +313,7 @@ class ChatSession:
             "/plugins, /plugin info <name>, /plugin enable <name>, "
             "/plugin disable <name>, /plugin reload <name|all>, "
             "/plugin health, /backup, /export [path], /import <path>, "
+            "/briefing [speak], "
             "/openart account|projects|models|kira info|generate <prompt>, "
             "/server start|stop|status, /speak <target> <text>, "
             "/undo last, "
@@ -438,7 +442,7 @@ class ChatSession:
         if not parts:
             self._respond(
                 "Home Assistant: /ha ping, /ha config, /ha states, "
-                "/ha summary, /ha lights, /ha on, /ha unavailable, "
+                "/ha status, /ha summary, /ha lights, /ha on, /ha unavailable, "
                 "/ha find <suchtext>, /ha export, /ha room <raumname>, "
                 "/ha media, /ha live start|stop|status|events|clear, "
                 "/ha entity <entity_id>, "
@@ -462,6 +466,9 @@ class ChatSession:
             return
         if command == "states":
             self._show_ha_states(self.homeassistant.states())
+            return
+        if command == "status":
+            self._show_home_status()
             return
         if command == "media":
             if len(parts) >= 2 and parts[1].lower() == "alexa":
@@ -529,6 +536,16 @@ class ChatSession:
             return
 
         self._respond("Home-Assistant-Befehl unvollstaendig. Nutze /ha fuer Hilfe.")
+
+    def _show_home_status(self) -> None:
+        self._respond(self.home_status.status().response)
+
+    def _briefing(self, command_text: str = "") -> None:
+        should_speak = command_text.strip().lower() == "speak"
+        briefing = self._home_briefing()
+        self._respond(briefing)
+        if should_speak:
+            self._speak_text(briefing)
 
     def _handle_ha_live(self, parts: list[str]) -> None:
         if not parts:
@@ -1243,6 +1260,13 @@ class ChatSession:
         )
 
     def _chat_response(self, message: str) -> str:
+        briefing_answer = self._answer_briefing_request(message)
+        if briefing_answer is not None:
+            return briefing_answer
+
+        if self._asks_for_home_status(message):
+            return self.home_status.status().response
+
         safety_answer = self._answer_homeassistant_safety(message)
         if safety_answer is not None:
             return safety_answer
@@ -1271,6 +1295,10 @@ class ChatSession:
         return self._fallback_response(message=message, result=result)
 
     def _assist_response(self, message: str, origin: AssistOrigin | None) -> str:
+        briefing_answer = self._answer_briefing_request(message)
+        if briefing_answer is not None:
+            return briefing_answer
+
         if self._asks_for_home_status(message):
             return self.home_status.status().response
 
@@ -1310,6 +1338,17 @@ class ChatSession:
             return result.content
 
         return self._assist_fallback_response(message=message, result=result)
+
+    def _answer_briefing_request(self, message: str) -> str | None:
+        if not self._asks_for_briefing(message):
+            return None
+        briefing = self._home_briefing()
+        if self._asks_for_spoken_briefing(message):
+            self._speak_text(briefing)
+        return briefing
+
+    def _home_briefing(self) -> str:
+        return self.home_status.briefing().response
 
     def _handle_contextual_light_intent(
         self,
@@ -1916,21 +1955,68 @@ class ChatSession:
         direct_phrases = {
             "status",
             "hausstatus",
+            "zuhause status",
+            "status zuhause",
+            "status wohnung",
+            "wohnung status",
             "ist alles okay",
             "check mal die wohnung",
+            "gib mir den hausstatus",
         }
         if text in direct_phrases:
             return True
         phrase_markers = (
+            "wie ist der hausstatus",
+            "wie ist der status zuhause",
             "wie sieht es zuhause aus",
             "wie siehts zuhause aus",
             "was ist los zuhause",
             "was ist zuhause los",
+            "was macht die wohnung",
             "check die wohnung",
             "check mal zuhause",
+            "ist zuhause alles okay",
             "alles okay zuhause",
         )
         return any(marker in text for marker in phrase_markers)
+
+    def _asks_for_briefing(self, message: str) -> bool:
+        text = self._normalize(message).strip().strip(".!?")
+        direct_phrases = {
+            "tagesbriefing",
+            "briefing",
+            "briefing sprechen",
+            "kurzes briefing bitte",
+            "gib mir ein briefing",
+            "mach ein briefing",
+            "was ist heute wichtig",
+            "gibt es zuhause etwas wichtiges",
+            "lies mir das briefing vor",
+            "sag mir das briefing",
+        }
+        if text in direct_phrases:
+            return True
+        phrase_markers = (
+            "gib mir ein briefing",
+            "mach ein briefing",
+            "kurzes briefing",
+            "tagesbriefing",
+            "was ist heute wichtig",
+            "gibt es zuhause etwas wichtiges",
+            "lies mir das briefing",
+            "sag mir das briefing",
+            "briefing sprechen",
+        )
+        return any(marker in text for marker in phrase_markers)
+
+    def _asks_for_spoken_briefing(self, message: str) -> bool:
+        text = self._normalize(message)
+        return (
+            "vorlesen" in text
+            or "lies mir" in text
+            or "sprechen" in text
+            or "sag mir" in text
+        ) and "briefing" in text
 
     def _asks_for_unclear_whole_house_action(self, message: str) -> bool:
         text = self._normalize(message).strip().strip(".!?")

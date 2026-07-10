@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QComboBox, QGridLayout, QLabel, QWidget
 
 from kira.homeassistant.media_players import MediaPlayerMatcher
 
-KIRA_DESKTOP_VERSION = "1.5.0"
+KIRA_DESKTOP_VERSION = "1.6.0"
 
 
 @dataclass(frozen=True, slots=True)

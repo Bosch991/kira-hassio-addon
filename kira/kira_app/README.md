@@ -1,6 +1,6 @@
 # Kira
 
-Kira `1.5.0` ist eine lokale, modulare Assistenten-Plattform. Die bisherigen
+Kira `1.6.0` ist eine lokale, modulare Assistenten-Plattform. Die bisherigen
 Funktionen bleiben erhalten: Terminal-Chat, OpenAI-Fallback, Home Assistant,
 Voice, Audio-Routing, Memory, Knowledge und Live-Events. Neu ist die
 Plattformschicht: Plugins, Event-Bus, Scheduler-Infrastruktur, API,
@@ -18,6 +18,8 @@ Mikrofon, Sprachausgabe, Statusanzeige und System Tray.
 Version `1.5.0` bereitet Kira als vollstaendiges Home-Assistant-OS-Add-on vor,
 damit Assist, Home-Assistant-Steuerung, Memory, Knowledge und `media_player`-
 Ausgabe direkt auf Hassio/NUC laufen koennen.
+Version `1.6.0` ergaenzt Home Status & Daily Briefing mit `/ha status`,
+`/briefing` und `/briefing speak`.
 
 ## Installation
 

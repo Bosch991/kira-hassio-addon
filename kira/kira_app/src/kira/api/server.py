@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from kira.chat.session import ChatSession
 from kira.core.app import KiraApplication
 
-KIRA_VERSION = "1.5.0"
+KIRA_VERSION = "1.6.0"
 
 
 class ChatRequest(BaseModel):

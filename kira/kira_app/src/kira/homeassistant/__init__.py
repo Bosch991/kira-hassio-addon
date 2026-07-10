@@ -36,7 +36,11 @@ from kira.homeassistant.permissions import (
     RiskLevel,
 )
 from kira.homeassistant.services import HomeAssistantServices
-from kira.homeassistant.status import HomeStatusResult, HomeStatusService
+from kira.homeassistant.status import (
+    HomeBriefingResult,
+    HomeStatusResult,
+    HomeStatusService,
+)
 from kira.homeassistant.undo import HomeAssistantUndoPlanner, UndoResult
 from kira.homeassistant.websocket import (
     HomeAssistantLiveClient,
@@ -74,6 +78,7 @@ __all__ = [
     "HomeAssistantUndoPlanner",
     "HomeAssistantWorldModel",
     "HomeAssistantWorldSnapshot",
+    "HomeBriefingResult",
     "HomeStatusResult",
     "HomeStatusService",
     "PermissionDecision",

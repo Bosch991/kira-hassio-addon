@@ -48,6 +48,14 @@ class HomeStatusResult:
     response: str
 
 
+@dataclass(frozen=True, slots=True)
+class HomeBriefingResult:
+    """Result returned by the daily briefing service."""
+
+    ok: bool
+    response: str
+
+
 class HomeStatusService:
     """Build compact, useful status summaries from Home Assistant states."""
 
@@ -73,18 +81,38 @@ class HomeStatusService:
         states = [item for item in result.data if isinstance(item, dict)]
         return HomeStatusResult(ok=True, response=self.from_states(states))
 
+    def briefing(self) -> HomeBriefingResult:
+        """Load Home Assistant states and return a short daily briefing."""
+        result = self.client.states()
+        if not result.ok:
+            return HomeBriefingResult(
+                ok=False,
+                response=self._error_response(result.error),
+            )
+        if not isinstance(result.data, list):
+            return HomeBriefingResult(
+                ok=False,
+                response="Briefing: Home Assistant lieferte keine State-Liste.",
+            )
+
+        states = [item for item in result.data if isinstance(item, dict)]
+        return HomeBriefingResult(ok=True, response=self.briefing_from_states(states))
+
     def from_states(self, states: list[dict[str, Any]]) -> str:
         """Build a compact status response from raw state dictionaries."""
         analysis = self.analyzer.analyze(states)
         entities = {entity.entity_id: entity for entity in analysis.entities}
+        printer_status = self._printer_status(entities)
+        washer_status = self._washer_status(entities)
         sections = [
             self._alarm_status(entities),
             self._door_window_status(entities),
+            self._closed_door_window_status(entities),
             self._light_status(analysis.active_lights),
-            self._printer_status(entities),
+            printer_status or self._printer_idle_status(entities),
             self._weather_status(entities),
             self._energy_status(entities),
-            self._washer_status(entities),
+            washer_status or self._washer_idle_status(entities),
             self._ring_status(entities),
         ]
         relevant = [section for section in sections if section]
@@ -93,7 +121,35 @@ class HomeStatusService:
                 "Hausstatus: Alles ruhig. Keine offenen Tueren oder Fenster, "
                 "keine kritischen Geraete."
             )
+        if relevant == ["Fenster und Tueren sind geschlossen."]:
+            return (
+                "Hausstatus: Alles ruhig. Keine offenen Tueren oder Fenster. "
+                "Fenster und Tueren sind geschlossen."
+            )
         return self._limit_response("Hausstatus: " + " ".join(relevant))
+
+    def briefing_from_states(self, states: list[dict[str, Any]]) -> str:
+        """Build a natural, compact daily briefing from raw states."""
+        analysis = self.analyzer.analyze(states)
+        entities = {entity.entity_id: entity for entity in analysis.entities}
+        details = [
+            self._alarm_status(entities),
+            self._door_window_status(entities)
+            or self._closed_door_window_status(entities),
+            self._brief_light_status(analysis.active_lights),
+            self._weather_status(entities),
+            self._energy_status(entities),
+            self._printer_status(entities) or self._printer_idle_status(entities),
+            self._washer_status(entities) or self._washer_idle_status(entities),
+            self._ring_status(entities),
+        ]
+        relevant = [detail for detail in details if detail]
+        if not relevant:
+            return "Zuhause sieht alles ruhig aus. Keine Auffaelligkeiten."
+        return self._limit_response(
+            "Zuhause sieht es so aus: " + " ".join(relevant),
+            max_length=800,
+        )
 
     def _alarm_status(self, entities: dict[str, EntityView]) -> str | None:
         alarm = self._valid_entity(entities, ALARM_ENTITY_ID)
@@ -119,12 +175,34 @@ class HomeStatusService:
         names = self._join_names([entity.label for entity in open_entities], limit=4)
         return f"Offen: {names}."
 
+    def _closed_door_window_status(
+        self,
+        entities: dict[str, EntityView],
+    ) -> str | None:
+        known_entities = [
+            entity
+            for entity_id in DOOR_WINDOW_ENTITY_IDS
+            if (entity := self._valid_entity(entities, entity_id)) is not None
+        ]
+        if not known_entities:
+            return None
+        if all(entity.state in {"off", "closed"} for entity in known_entities):
+            return "Fenster und Tueren sind geschlossen."
+        return None
+
     def _light_status(self, active_lights: list[EntityView]) -> str | None:
         if not active_lights:
             return None
         names = self._join_names([entity.label for entity in active_lights], limit=5)
+        if len(active_lights) == 1:
+            return f"Ein Licht ist an: {names}."
         count = self._number_word(len(active_lights))
         return f"{count} Lichter sind an: {names}."
+
+    def _brief_light_status(self, active_lights: list[EntityView]) -> str | None:
+        if not active_lights:
+            return "Die Lichter sind aus."
+        return self._light_status(active_lights)
 
     def _printer_status(self, entities: dict[str, EntityView]) -> str | None:
         in_progress = self._valid_entity(
@@ -158,6 +236,15 @@ class HomeStatusService:
             details.append(f"ETA {eta}")
         suffix = ", ".join(details)
         return f"Der Kobra S1 druckt{f' {suffix}' if suffix else ''}."
+
+    def _printer_idle_status(self, entities: dict[str, EntityView]) -> str | None:
+        known = [
+            self._valid_entity(entities, entity_id) for entity_id in PRINTER_ENTITY_IDS
+        ]
+        known = [entity for entity in known if entity is not None]
+        if not known:
+            return None
+        return "Der 3D-Drucker laeuft nicht."
 
     def _weather_status(self, entities: dict[str, EntityView]) -> str | None:
         weather = self._valid_entity(entities, WEATHER_ENTITY_ID)
@@ -199,6 +286,17 @@ class HomeStatusService:
         if power is None:
             return "Waschmaschine laeuft."
         return f"Waschmaschine laeuft mit {self._format_number(power)} W."
+
+    def _washer_idle_status(self, entities: dict[str, EntityView]) -> str | None:
+        washer = self._valid_entity(entities, "switch.shelly1pmg3_cc8da246efb4")
+        power = self._float_state(entities, "sensor.shelly1pmg3_cc8da246efb4_power")
+        if washer is None and power is None:
+            return None
+        if washer is not None and washer.state == "off":
+            return "Die Waschmaschine ist aus."
+        if power is not None and power <= 5:
+            return "Die Waschmaschine ist aus."
+        return None
 
     def _ring_status(self, entities: dict[str, EntityView]) -> str | None:
         ring = self._valid_entity(entities, "binary_sensor.klingel_klingelsensor")

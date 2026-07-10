@@ -13,6 +13,7 @@ class ChatCommand(StrEnum):
     ABOUT = "about"
     AUDIO = "audio"
     BACKUP = "backup"
+    BRIEFING = "briefing"
     EXPORT = "export"
     HA = "ha"
     HELP = "help"
@@ -61,6 +62,11 @@ def parse_input(raw_input: str) -> ParsedInput:
         return ParsedInput(ChatCommand.AUDIO, value.removeprefix("/audio").strip())
     if lowered == "/backup":
         return ParsedInput(ChatCommand.BACKUP)
+    if lowered.startswith("/briefing"):
+        return ParsedInput(
+            ChatCommand.BRIEFING,
+            value.removeprefix("/briefing").strip(),
+        )
     if lowered.startswith("/export"):
         return ParsedInput(ChatCommand.EXPORT, value.removeprefix("/export").strip())
     if lowered == "/help":

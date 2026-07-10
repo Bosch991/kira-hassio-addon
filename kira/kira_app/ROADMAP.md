@@ -1,5 +1,12 @@
 # Roadmap
 
+## 1.6.0 Home Status & Daily Briefing
+
+- lokale Hausstatus-Erkennung
+- `/ha status`
+- `/briefing`
+- `/briefing speak`
+
 ## 1.5.0 Home Assistant OS Add-on
 
 - Kira laeuft komplett als Home-Assistant-OS-Add-on auf Hassio/NUC
