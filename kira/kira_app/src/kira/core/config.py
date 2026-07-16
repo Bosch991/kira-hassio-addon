@@ -73,6 +73,19 @@ class Settings(BaseSettings):
         alias="KIRA_AVATAR_PATH",
     )
     start_minimized: bool = Field(default=False, alias="KIRA_START_MINIMIZED")
+    companion_show_on_start: bool = Field(
+        default=True,
+        alias="KIRA_COMPANION_SHOW_ON_START",
+    )
+    companion_always_on_top: bool = Field(
+        default=True,
+        alias="KIRA_COMPANION_ALWAYS_ON_TOP",
+    )
+    companion_bubble_auto_hide: bool = Field(
+        default=True,
+        alias="KIRA_COMPANION_BUBBLE_AUTO_HIDE",
+    )
+    companion_size: str = Field(default="small", alias="KIRA_COMPANION_SIZE")
 
     root_dir: Path = Field(default_factory=project_root, alias="KIRA_ROOT_DIR")
     data_dir: Path | None = Field(default=None, alias="KIRA_DATA_DIR")
@@ -90,6 +103,10 @@ class Settings(BaseSettings):
     audio_settings_path: Path | None = Field(
         default=None,
         alias="KIRA_AUDIO_SETTINGS_PATH",
+    )
+    companion_settings_path: Path | None = Field(
+        default=None,
+        alias="KIRA_COMPANION_SETTINGS_PATH",
     )
     ha_live_events_path: Path | None = Field(
         default=None,
@@ -140,6 +157,10 @@ class Settings(BaseSettings):
             self.audio_input_dir = self.data_dir / "audio" / "input"
         if self.audio_settings_path is None:
             self.audio_settings_path = self.data_dir / "audio" / "settings.json"
+        if self.companion_settings_path is None:
+            self.companion_settings_path = (
+                self.data_dir / "desktop" / "companion_settings.json"
+            )
         if self.ha_live_events_path is None:
             self.ha_live_events_path = (
                 self.data_dir / "homeassistant" / "live_events.json"

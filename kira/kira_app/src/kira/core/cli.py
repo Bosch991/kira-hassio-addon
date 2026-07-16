@@ -7,6 +7,7 @@ import logging
 
 from kira.chat.session import ChatSession
 from kira.core.app import create_app
+from kira.version import KIRA_VERSION
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -23,7 +24,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> None:
     """Run the command line interface."""
     parser = build_parser()
+    parser.add_argument("--version", action="store_true", help="Show Kira version")
     args = parser.parse_args(argv)
+
+    if args.version:
+        print(KIRA_VERSION)
+        return
 
     app = create_app()
     app.start()

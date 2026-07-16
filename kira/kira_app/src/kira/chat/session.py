@@ -61,6 +61,7 @@ from kira.openart.client import OpenArtClient, OpenArtResult, OpenArtStatus
 from kira.openart.history import OpenArtHistoryStore
 from kira.openart.prompt_builder import OpenArtPromptBuilder
 from kira.plugins.plugin_manager import PluginManager
+from kira.services.update_service import UpdateService
 from kira.telemetry.store import TelemetryStore
 from kira.voice.providers import ElevenLabsVoiceProvider, VoiceResult, VoiceStatus
 
@@ -97,6 +98,7 @@ class ChatSession:
         openart_history: OpenArtHistoryStore | None = None,
         plugin_manager: PluginManager | None = None,
         backup_service: BackupService | None = None,
+        update_service: UpdateService | None = None,
         event_bus: EventBus | None = None,
         telemetry: TelemetryStore | None = None,
         console: Console | None = None,
@@ -141,6 +143,7 @@ class ChatSession:
         self.openart_history = openart_history
         self.plugin_manager = plugin_manager
         self.backup_service = backup_service
+        self.update_service = update_service or UpdateService(settings.root_dir)
         self.event_bus = event_bus
         self.telemetry = telemetry
         self.ha_analyzer = HomeAssistantAnalyzer()
@@ -185,6 +188,7 @@ class ChatSession:
             openart_history=app.openart_history,
             plugin_manager=app.plugin_manager,
             backup_service=app.backup,
+            update_service=getattr(app, "update_service", None),
             event_bus=app.event_bus,
             telemetry=app.telemetry,
         )
@@ -282,6 +286,9 @@ class ChatSession:
                 if parsed.command is ChatCommand.UNDO:
                     self._undo(parsed.text)
                     continue
+                if parsed.command is ChatCommand.UPDATES:
+                    self._handle_updates(parsed.text)
+                    continue
                 if parsed.command is ChatCommand.VOICE:
                     self._voice_turn(parsed.text)
                     continue
@@ -316,7 +323,7 @@ class ChatSession:
             "/briefing [speak], "
             "/openart account|projects|models|kira info|generate <prompt>, "
             "/server start|stop|status, /speak <target> <text>, "
-            "/undo last, "
+            "/updates status|check|pull|restart, /undo last, "
             "/listen, /voice [local|ha], /voices, /say <text>, "
             "/speak_last [local|ha], /exit. "
             "Mit 'Merke: ...' speichere ich eine lokale Notiz."
@@ -333,6 +340,76 @@ class ChatSession:
                 "chat.message", time.perf_counter() - started
             )
         return response
+
+    def handle_local_input(self, raw_input: str) -> str:
+        """Handle terminal-style input, including slash commands, and return output."""
+        parsed = parse_input(raw_input)
+        if parsed.command is ChatCommand.MESSAGE:
+            return self.handle_assist_message(parsed.text)
+
+        if self.session_log is not None:
+            self._write_session_line("user", raw_input)
+
+        self.last_response = None
+        if parsed.command is ChatCommand.EXIT:
+            self._respond("Bis bald. Ich bin hier, wenn du weiterbauen willst.")
+        elif parsed.command is ChatCommand.ABOUT:
+            self._show_about()
+        elif parsed.command is ChatCommand.AUDIO:
+            self._handle_audio(parsed.text)
+        elif parsed.command is ChatCommand.BACKUP:
+            self._backup()
+        elif parsed.command is ChatCommand.BRIEFING:
+            self._briefing(parsed.text)
+        elif parsed.command is ChatCommand.EXPORT:
+            self._export(parsed.text)
+        elif parsed.command is ChatCommand.HELP:
+            self._show_help()
+        elif parsed.command is ChatCommand.LISTEN:
+            self._listen()
+        elif parsed.command is ChatCommand.HA:
+            self._handle_homeassistant(parsed.text)
+        elif parsed.command is ChatCommand.IMPORT:
+            self._import(parsed.text)
+        elif parsed.command is ChatCommand.MEMORY:
+            self._show_memory()
+        elif parsed.command is ChatCommand.MEDIA:
+            self._handle_media(parsed.text)
+        elif parsed.command is ChatCommand.OPENART:
+            self._handle_openart(parsed.text)
+        elif parsed.command is ChatCommand.PLUGINS:
+            self._show_plugins()
+        elif parsed.command is ChatCommand.PLUGIN:
+            self._handle_plugin(parsed.text)
+        elif parsed.command is ChatCommand.PROJECTS:
+            self._show_projects()
+        elif parsed.command is ChatCommand.RELOAD:
+            self.reload_context()
+            self._respond("Prompts und Wissensdateien neu geladen.")
+        elif parsed.command is ChatCommand.REMEMBER:
+            self._remember(parsed.text)
+        elif parsed.command is ChatCommand.STATS:
+            self._show_stats()
+        elif parsed.command is ChatCommand.SAY:
+            self._say(parsed.text)
+        elif parsed.command is ChatCommand.SERVER:
+            self._handle_server(parsed.text)
+        elif parsed.command is ChatCommand.SPEAK:
+            self._speak_command(parsed.text)
+        elif parsed.command is ChatCommand.SPEAK_LAST:
+            self._speak_last(parsed.text)
+        elif parsed.command is ChatCommand.UNDO:
+            self._undo(parsed.text)
+        elif parsed.command is ChatCommand.UPDATES:
+            self._handle_updates(parsed.text)
+        elif parsed.command is ChatCommand.VOICE:
+            self._voice_turn(parsed.text)
+        elif parsed.command is ChatCommand.VOICES:
+            self._show_voices()
+        elif parsed.command is ChatCommand.UNKNOWN:
+            self._respond("Diesen Befehl kenne ich noch nicht. Nutze /help fuer Hilfe.")
+
+        return self.last_response or ""
 
     def handle_assist_message(
         self,
@@ -431,6 +508,24 @@ class ChatSession:
             self._respond("Undo: Nutze /undo last.")
             return
         self._respond(self.ha_undo.undo_last().message)
+
+    def _handle_updates(self, command_text: str) -> None:
+        command = command_text.strip().lower()
+        if command == "status":
+            self._respond(self._format_update_status())
+            return
+        if command == "check":
+            self._respond(self._format_update_check())
+            return
+        if command == "pull":
+            self._respond(self._format_update_pull())
+            return
+        if command == "restart":
+            self._respond(self.update_service.restart_hint())
+            return
+        self._respond(
+            "Updates: /updates status, /updates check, /updates pull, /updates restart"
+        )
 
     def reload_context(self) -> None:
         """Reload personality prompt and knowledge files from disk."""
@@ -1260,6 +1355,10 @@ class ChatSession:
         )
 
     def _chat_response(self, message: str) -> str:
+        update_answer = self._answer_update_request(message)
+        if update_answer is not None:
+            return update_answer
+
         briefing_answer = self._answer_briefing_request(message)
         if briefing_answer is not None:
             return briefing_answer
@@ -1295,6 +1394,10 @@ class ChatSession:
         return self._fallback_response(message=message, result=result)
 
     def _assist_response(self, message: str, origin: AssistOrigin | None) -> str:
+        update_answer = self._answer_update_request(message)
+        if update_answer is not None:
+            return update_answer
+
         briefing_answer = self._answer_briefing_request(message)
         if briefing_answer is not None:
             return briefing_answer
@@ -1349,6 +1452,75 @@ class ChatSession:
 
     def _home_briefing(self) -> str:
         return self.home_status.briefing().response
+
+    def _answer_update_request(self, message: str) -> str | None:
+        if self._asks_for_update_pull(message):
+            return self._format_update_pull()
+        if self._asks_for_update_check(message):
+            return self._format_update_check()
+        if self._asks_for_update_restart(message):
+            return self.update_service.restart_hint()
+        if self._asks_for_update_status(message):
+            return self._format_update_status()
+        return None
+
+    def _format_update_status(self) -> str:
+        status = self.update_service.local_status()
+        tree = "sauber" if status.clean else "nicht sauber"
+        uncommitted = "ja" if status.has_uncommitted_changes else "nein"
+        return (
+            "Kira Update-Status:\n"
+            f"- Version: {status.version}\n"
+            f"- Branch: {status.branch}\n"
+            f"- Commit: {status.commit}\n"
+            f"- Arbeitsbaum: {tree}\n"
+            f"- Lokale Aenderungen: {uncommitted}\n"
+            f"- Untracked Files: {'ja' if status.has_untracked_files else 'nein'}\n"
+            f"- Remote: {self._translate_remote_status(status.remote_status)}"
+        )
+
+    def _format_update_check(self) -> str:
+        result = self.update_service.check_remote()
+        if result.remote_status == "behind":
+            return (
+                "Update-Check:\n"
+                f"{result.message}\n"
+                "Nutze /updates pull, um zu aktualisieren."
+            )
+        if result.remote_status == "up_to_date":
+            return "Update-Check:\nKira ist aktuell."
+        if result.remote_status == "ahead":
+            return f"Update-Check:\n{result.message}"
+        if result.remote_status == "diverged":
+            return f"Update-Check:\n{result.message}"
+        return f"Update-Check:\nRemote nicht erreichbar: {result.message}"
+
+    def _format_update_pull(self) -> str:
+        result = self.update_service.pull_updates()
+        if not result.success:
+            return result.message
+        lines = [
+            "Update geladen.",
+            f"Alter Commit: {result.old_commit or 'unknown'}",
+            f"Neuer Commit: {result.new_commit or 'unknown'}",
+            "Neustart empfohlen.",
+            "Nutze /updates restart oder starte Kira neu.",
+        ]
+        if result.health:
+            lines.append(f"Healthcheck: {result.health}")
+        return "\n".join(lines)
+
+    def _translate_remote_status(self, status: str) -> str:
+        translations = {
+            "not_checked": "nicht geprueft",
+            "up_to_date": "aktuell",
+            "behind": "GitHub ist neuer",
+            "ahead": "lokal voraus",
+            "diverged": "auseinander gelaufen",
+            "remote_unavailable": "nicht erreichbar",
+            "unavailable": "nicht verfuegbar",
+        }
+        return translations.get(status, status)
 
     def _handle_contextual_light_intent(
         self,
@@ -2018,6 +2190,49 @@ class ChatSession:
             or "sag mir" in text
         ) and "briefing" in text
 
+    def _asks_for_update_status(self, message: str) -> bool:
+        text = self._normalize(message).strip().strip(".!?")
+        direct_phrases = {
+            "wie ist der update-status",
+            "wie ist der update status",
+            "welche version laeuft",
+            "welche kira-version laeuft",
+            "welche kira version laeuft",
+            "ist kira aktuell",
+            "kira update status",
+        }
+        return text in direct_phrases
+
+    def _asks_for_update_check(self, message: str) -> bool:
+        text = self._normalize(message).strip().strip(".!?")
+        direct_phrases = {
+            "pruefe auf updates",
+            "pruef auf updates",
+            "gibt es ein update",
+            "ist github neuer",
+            "check updates",
+        }
+        return text in direct_phrases
+
+    def _asks_for_update_pull(self, message: str) -> bool:
+        text = self._normalize(message).strip().strip(".!?")
+        direct_phrases = {
+            "aktualisiere kira",
+            "zieh das update",
+            "pull updates",
+            "update laden",
+        }
+        return text in direct_phrases
+
+    def _asks_for_update_restart(self, message: str) -> bool:
+        text = self._normalize(message).strip().strip(".!?")
+        direct_phrases = {
+            "kira neu starten",
+            "restart kira",
+            "neustart hinweis",
+        }
+        return text in direct_phrases
+
     def _asks_for_unclear_whole_house_action(self, message: str) -> bool:
         text = self._normalize(message).strip().strip(".!?")
         return text in {"mach alles aus", "alles aus", "schalte alles aus"}
@@ -2148,6 +2363,10 @@ class ChatSession:
     def _normalize(self, text: str) -> str:
         return (
             text.lower()
+            .replace("ä", "ae")
+            .replace("ö", "oe")
+            .replace("ü", "ue")
+            .replace("ß", "ss")
             .replace("ä", "ae")
             .replace("ö", "oe")
             .replace("ü", "ue")

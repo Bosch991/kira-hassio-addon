@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from html import escape
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
@@ -87,4 +88,10 @@ class ChatWidget(QWidget):
         self.send_requested.emit(text)
 
     def _append(self, speaker: str, text: str) -> None:
-        self.history.append(f"<b>{speaker}:</b> {text}")
+        safe_text = escape(text).replace("\n", "<br>")
+        if speaker == "Du":
+            self.history.append(
+                f"<p><b>Du:</b><br><blockquote>{safe_text}</blockquote></p>"
+            )
+            return
+        self.history.append(f"<p><b>Kira:</b><br>{safe_text}</p>")

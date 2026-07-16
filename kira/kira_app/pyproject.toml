@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kira-assistant"
-version = "1.6.0"
+version = "1.9.0"
 description = "Local-first personal AI assistant foundation."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -73,3 +73,4 @@ convention = "google"
 [tool.black]
 line-length = 88
 target-version = ["py312"]
+

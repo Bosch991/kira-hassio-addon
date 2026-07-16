@@ -1,5 +1,5 @@
-name: Kira
-version: "1.6.0"
+﻿name: Kira
+version: "1.9.0"
 slug: kira
 description: Local-first Kira Assist server for Home Assistant OS
 url: "https://github.com/Bosch991/kira-hassio-addon"
@@ -49,3 +49,4 @@ schema:
   openart_default_project_id: str
   log_level: list(DEBUG|INFO|WARNING|ERROR)
   live_notifications: bool
+

@@ -1,6 +1,6 @@
 # Kira
 
-Kira `1.6.0` ist eine lokale, modulare Assistenten-Plattform. Die bisherigen
+Kira `1.9.0` ist eine lokale, modulare Assistenten-Plattform. Die bisherigen
 Funktionen bleiben erhalten: Terminal-Chat, OpenAI-Fallback, Home Assistant,
 Voice, Audio-Routing, Memory, Knowledge und Live-Events. Neu ist die
 Plattformschicht: Plugins, Event-Bus, Scheduler-Infrastruktur, API,
@@ -18,8 +18,16 @@ Mikrofon, Sprachausgabe, Statusanzeige und System Tray.
 Version `1.5.0` bereitet Kira als vollstaendiges Home-Assistant-OS-Add-on vor,
 damit Assist, Home-Assistant-Steuerung, Memory, Knowledge und `media_player`-
 Ausgabe direkt auf Hassio/NUC laufen koennen.
-Version `1.6.0` ergaenzt Home Status & Daily Briefing mit `/ha status`,
-`/briefing` und `/briefing speak`.
+Version `1.6.0` ergaenzt Home Status & Daily Briefing. Hausstatus-Fragen und
+Briefings laufen lokal ueber Home Assistant und werden nicht an OpenAI
+weitergereicht, wenn die Absicht eindeutig erkannt wird.
+Version `1.7.0` ergaenzt Update- und Deployment-Komfort fuer lokale Git-
+Checkouts und den Home-Assistant-Add-on-Betrieb.
+Version `1.8.0` ergaenzt Desktop-Komfort mit Dashboard, Statuskarten,
+Schnellbuttons, Healthcheck-Ansicht, Update-Status und erweitertem Tray-Menue.
+Version `1.9.0` ergaenzt einen kleinen Floating Desktop Companion mit
+Always-on-top-Fenster, Sprechblase, Kira-Avatar, Kontextmenue und
+Schnellaktionen.
 
 ## Installation
 
@@ -86,6 +94,10 @@ KIRA_API_TOKEN=
 KIRA_DESKTOP_THEME=dark
 KIRA_AVATAR_PATH=assets/avatar/kira.png
 KIRA_START_MINIMIZED=false
+KIRA_COMPANION_SHOW_ON_START=true
+KIRA_COMPANION_ALWAYS_ON_TOP=true
+KIRA_COMPANION_BUBBLE_AUTO_HIDE=true
+KIRA_COMPANION_SIZE=small
 LOG_LEVEL=INFO
 ```
 
@@ -108,6 +120,96 @@ Aktuelle Core-Plugins:
 
 Jedes Plugin besitzt `manifest.json`, `plugin.py` und `README.md`.
 
+## Home Status & Daily Briefing
+
+Der Hausstatus nutzt vorhandene Home-Assistant-Daten lokal ueber den
+`HomeStatusService`. OpenAI wird dafuer nicht benoetigt.
+
+```text
+/ha status
+/briefing
+/briefing speak
+```
+
+`/briefing` fasst nach Verfuegbarkeit Lichter, Fenster/Tueren, Wetter,
+PV/Energie, 3D-Drucker, Waschmaschine, Klingel und Auffaelligkeiten kurz
+zusammen. `/briefing speak` gibt denselben Text im Terminal aus und nutzt danach
+die vorhandene ElevenLabs-/Audio-Routing-Konfiguration fuer Sprachausgabe.
+
+OpenArt ist fuer Hausstatus und Briefing optional. Ein Healthcheck mit
+`openart: ok - missing configuration` blockiert diese Funktionen nicht.
+
+## Updates
+
+Kira kann den lokalen Git-Checkout pruefen und sichere Fast-Forward-Updates
+ausfuehren. Der Update-Service fuehrt keine Merge-Commits aus, bricht bei
+lokalen Aenderungen ab und gibt nur Neustart-Hinweise aus. Prozesse werden nie
+automatisch beendet.
+
+```text
+/updates status
+/updates check
+/updates pull
+/updates restart
+```
+
+`/updates status` zeigt Version, Branch, Commit und lokale Aenderungen.
+`/updates check` vergleicht den Checkout mit dem konfigurierten Upstream.
+`/updates pull` fuehrt nur bei sauberem Arbeitsbaum `git pull --ff-only` aus.
+`/updates restart` erklaert den sicheren Neustart fuer Terminal, API-Server
+und Home-Assistant-Add-on.
+
+## Desktop-Komfort
+
+Der Desktop ist eine Komfortoberflaeche fuer lokale Kira-Funktionen. CLI und
+API bleiben unveraendert verfuegbar.
+
+Neu in `1.8.0`:
+
+- Dashboard mit kompakten Statuskarten fuer Kira, Server, Home Assistant,
+  OpenAI, Voice, Memory/Knowledge und Updates
+- Healthcheck-Ansicht fuer `homeassistant`, `knowledge`, `memory`, `openai`,
+  `openart` und `voice`
+- Schnellbuttons fuer Hausstatus, Briefing, Briefing sprechen, Updates,
+  Healthcheck, Version und Status-Refresh
+- erweitertes Tray-Menue mit denselben sicheren Schnellaktionen
+- Serversteuerung als sichere Hinweise statt automatischem Prozess-Kill
+
+OpenArt mit `missing configuration` ist im Desktop ein Hinweis, kein
+blockierender Fehler. Secrets wie API-Keys oder Home-Assistant-Tokens werden
+nicht angezeigt.
+
+## Desktop Companion
+
+Kira `1.9.0` startet in der Desktop-App optional einen kleinen Floating
+Assistant. Der Companion ist ein leichtgewichtiges, verschiebbares Fenster mit
+transparentem Hintergrund, Always-on-top-Modus, Kira-Avatar, kurzer
+Sprechblase und Schnellaktionen.
+
+Direkt am Companion:
+
+- `HA` fuer `/ha status`
+- `Briefing` fuer `/briefing`
+- `Say` fuer `/briefing speak`
+- `Update` fuer `/updates status`
+
+Linksklick auf den Companion holt das Desktop-Hauptfenster nach vorne.
+Rechtsklick oeffnet ein Kontextmenue mit Hausstatus, Briefing, Briefing
+sprechen, Updates pruefen, Desktop oeffnen, Companion ausblenden und Beenden.
+Die Sprechblase zeigt kurze Rueckmeldungen und kann automatisch ausblenden.
+
+Vorbereitete Companion-Zustaende:
+
+- `idle`
+- `thinking`
+- `speaking`
+- `warning`
+- `happy`
+
+Wenn `assets/avatar/kira.png` fehlt, nutzt Kira eine saubere Platzhalterfigur.
+Die Position wird lokal unter `data/desktop/companion_settings.json`
+gespeichert.
+
 ## Chat-Kommandos
 
 - `/about`, `/help`, `/stats`, `/reload`, `/exit`
@@ -120,6 +222,13 @@ Jedes Plugin besitzt `manifest.json`, `plugin.py` und `README.md`.
 - `/plugin reload all`
 - `/plugin health`
 - `/backup`
+- `/updates status`
+- `/updates check`
+- `/updates pull`
+- `/updates restart`
+- `/ha status`
+- `/briefing`
+- `/briefing speak`
 - `/export [path]`
 - `/import <path>`
 - `/openart account`

@@ -34,6 +34,7 @@ class ChatCommand(StrEnum):
     SPEAK = "speak"
     SPEAK_LAST = "speak_last"
     UNDO = "undo"
+    UPDATES = "updates"
     VOICES = "voices"
     VOICE = "voice"
     UNKNOWN = "unknown"
@@ -109,6 +110,11 @@ def parse_input(raw_input: str) -> ParsedInput:
         )
     if lowered.startswith("/undo"):
         return ParsedInput(ChatCommand.UNDO, value.removeprefix("/undo").strip())
+    if lowered.startswith("/updates"):
+        return ParsedInput(
+            ChatCommand.UPDATES,
+            value.removeprefix("/updates").strip(),
+        )
     if lowered == "/voices":
         return ParsedInput(ChatCommand.VOICES)
     if lowered.startswith("/voice"):

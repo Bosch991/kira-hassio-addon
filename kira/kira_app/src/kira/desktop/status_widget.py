@@ -6,11 +6,21 @@ from dataclasses import dataclass
 from typing import Any
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QGridLayout, QLabel, QWidget
+from PySide6.QtWidgets import (
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
+from kira.desktop.dashboard import DashboardSnapshot
 from kira.homeassistant.media_players import MediaPlayerMatcher
+from kira.version import KIRA_VERSION
 
-KIRA_DESKTOP_VERSION = "1.6.0"
+KIRA_DESKTOP_VERSION = KIRA_VERSION
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +77,93 @@ class DesktopStatusViewModel:
             )
             for player in players
         ]
+
+
+class DashboardWidget(QWidget):
+    """Compact dashboard with status cards and health lines."""
+
+    def __init__(self, snapshot: DashboardSnapshot) -> None:
+        """Initialize the dashboard cards."""
+        super().__init__()
+        self.card_labels: dict[str, QLabel] = {}
+        self.health_label = QLabel()
+        self.health_label.setObjectName("statusDetail")
+        self.checked_label = QLabel()
+        self.checked_label.setObjectName("statusDetail")
+
+        self.layout = QGridLayout(self)
+        self.update_snapshot(snapshot)
+
+    def update_snapshot(self, snapshot: DashboardSnapshot) -> None:
+        """Update visible dashboard data."""
+        while self.layout.count():
+            item = self.layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        for index, card in enumerate(snapshot.cards):
+            box = QGroupBox(card.title)
+            box.setProperty("level", card.level)
+            box_layout = QVBoxLayout(box)
+            status = QLabel(card.status)
+            status.setObjectName("statusValue")
+            detail = QLabel(card.detail)
+            detail.setObjectName("statusDetail")
+            detail.setWordWrap(True)
+            box_layout.addWidget(status)
+            box_layout.addWidget(detail)
+            self.layout.addWidget(box, index // 2, index % 2)
+
+        health_text = "\n".join(
+            f"{item.name}: {item.status}" + (f" - {item.detail}" if item.detail else "")
+            for item in snapshot.health
+        )
+        self.health_label = QLabel(health_text or "Keine Healthcheck-Daten")
+        self.health_label.setObjectName("statusDetail")
+        self.health_label.setWordWrap(True)
+        health_box = QGroupBox("Healthcheck")
+        health_layout = QVBoxLayout(health_box)
+        health_layout.addWidget(self.health_label)
+        self.layout.addWidget(health_box, 4, 0, 1, 2)
+
+        checked = snapshot.checked_at.astimezone().strftime("%H:%M:%S")
+        self.checked_label = QLabel(f"Letzter Check: {checked}")
+        self.checked_label.setObjectName("statusDetail")
+        self.layout.addWidget(self.checked_label, 5, 0, 1, 2)
+
+
+class QuickActionsWidget(QWidget):
+    """Quick action buttons for common local Kira commands."""
+
+    action_requested = Signal(str)
+
+    ACTIONS: tuple[tuple[str, str], ...] = (
+        ("Hausstatus", "home_status"),
+        ("Briefing", "briefing"),
+        ("Briefing sprechen", "briefing_speak"),
+        ("Updates pruefen", "updates_check"),
+        ("Update-Status", "updates_status"),
+        ("Healthcheck", "healthcheck"),
+        ("Version", "version"),
+        ("Status aktualisieren", "refresh_status"),
+        ("Server starten", "server_start"),
+        ("Server stoppen", "server_stop"),
+        ("Serverstatus", "server_status"),
+    )
+
+    def __init__(self) -> None:
+        """Initialize quick action buttons."""
+        super().__init__()
+        layout = QGridLayout(self)
+        for index, (label, action) in enumerate(self.ACTIONS):
+            button = QPushButton(label)
+            button.clicked.connect(
+                lambda checked=False, action_name=action: self.action_requested.emit(
+                    action_name
+                )
+            )
+            layout.addWidget(button, index // 2, index % 2)
 
 
 class StatusWidget(QWidget):

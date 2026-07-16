@@ -1,11 +1,43 @@
 # Roadmap
 
+## 1.9.0 Desktop Companion
+
+- kleiner Floating Assistant als Always-on-top-Fenster
+- Kira-Avatar mit Platzhalter-Fallback und vorbereiteten Zustaenden
+- Sprechblase fuer kurze Meldungen und Statusantworten
+- Schnellaktionen fuer Hausstatus, Briefing, Sprachausgabe und Updates
+- Kontextmenue und Tray-Anbindung fuer Anzeigen/Ausblenden
+- lokale Companion-Einstellungen mit gespeicherter Position
+
+## 1.8.0 Desktop-Komfort
+
+- Dashboard mit Statuskarten fuer Kira, Server, Home Assistant, OpenAI, Voice,
+  Memory/Knowledge und Updates
+- Schnellbuttons fuer Hausstatus, Briefing, Sprachausgabe, Updates, Healthcheck
+  und Version
+- Healthcheck-Ansicht mit OpenArt `missing configuration` als Hinweis statt
+  blockierendem Fehler
+- erweitertes Tray-Menue mit sicheren Aktionen
+- Serversteuerung im Desktop als Hinweis, ohne unsichere Prozess-Kills
+
+## 1.7.0 Update- und Deployment-Komfort
+
+- `/updates status` fuer lokale Version, Branch, Commit und Arbeitsbaum
+- `/updates check` fuer sicheren GitHub-Vergleich per `git fetch`
+- `/updates pull` mit sauberem Arbeitsbaum und `git pull --ff-only`
+- `/updates restart` mit sicheren Neustart-Hinweisen
+- API-Endpunkte fuer Update-Status, Check, Pull und Restart-Hinweis
+- keine Secrets in Ausgaben oder Logs
+- OpenArt `missing configuration` blockiert Updates nicht
+
 ## 1.6.0 Home Status & Daily Briefing
 
-- lokale Hausstatus-Erkennung
-- `/ha status`
-- `/briefing`
-- `/briefing speak`
+- lokale Hausstatus-Erkennung fuer natuerliche Fragen
+- `/ha status` als direkter Home-Assistant-Statusbefehl
+- `/briefing` fuer ein kurzes Tagesbriefing
+- `/briefing speak` mit vorhandener ElevenLabs-/Audio-Routing-Integration
+- keine OpenAI-Anfrage bei eindeutigen Hausstatus- oder Briefing-Phrasen
+- OpenArt bleibt optional und blockiert diese Funktionen nicht
 
 ## 1.5.0 Home Assistant OS Add-on
 

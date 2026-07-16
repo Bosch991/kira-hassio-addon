@@ -9,8 +9,7 @@ from pydantic import BaseModel, Field
 
 from kira.chat.session import ChatSession
 from kira.core.app import KiraApplication
-
-KIRA_VERSION = "1.6.0"
+from kira.version import KIRA_VERSION
 
 
 class ChatRequest(BaseModel):
@@ -46,6 +45,18 @@ class AssistResponse(BaseModel):
     handled: bool = True
     speak: bool = False
     output_target: str | None = None
+
+
+class UpdateResponse(BaseModel):
+    """Response body for update endpoints."""
+
+    success: bool
+    version: str
+    branch: str | None = None
+    commit: str | None = None
+    clean: bool | None = None
+    remote_status: str
+    message: str
 
 
 def create_api(app: KiraApplication) -> Any:
@@ -98,6 +109,62 @@ def create_api(app: KiraApplication) -> Any:
             }
             for record in app.plugin_manager.list_plugins()
         ]
+
+    @api.get("/updates/status")
+    def updates_status() -> UpdateResponse:
+        status_result = app.update_service.local_status()
+        return UpdateResponse(
+            success=True,
+            version=status_result.version,
+            branch=status_result.branch,
+            commit=status_result.commit,
+            clean=status_result.clean,
+            remote_status=status_result.remote_status,
+            message=status_result.message,
+        )
+
+    @api.get("/updates/check")
+    def updates_check() -> UpdateResponse:
+        check_result = app.update_service.check_remote()
+        status_result = app.update_service.local_status(
+            remote_status=check_result.remote_status
+        )
+        return UpdateResponse(
+            success=check_result.success,
+            version=status_result.version,
+            branch=status_result.branch,
+            commit=status_result.commit,
+            clean=status_result.clean,
+            remote_status=check_result.remote_status,
+            message=check_result.message,
+        )
+
+    @api.post("/updates/pull")
+    def updates_pull() -> UpdateResponse:
+        result = app.update_service.pull_updates()
+        status_result = app.update_service.local_status()
+        return UpdateResponse(
+            success=result.success,
+            version=result.version or status_result.version,
+            branch=status_result.branch,
+            commit=result.new_commit or status_result.commit,
+            clean=status_result.clean,
+            remote_status=status_result.remote_status,
+            message=result.message,
+        )
+
+    @api.post("/updates/restart")
+    def updates_restart() -> UpdateResponse:
+        status_result = app.update_service.local_status()
+        return UpdateResponse(
+            success=True,
+            version=status_result.version,
+            branch=status_result.branch,
+            commit=status_result.commit,
+            clean=status_result.clean,
+            remote_status=status_result.remote_status,
+            message=app.update_service.restart_hint(),
+        )
 
     @api.post("/chat", dependencies=[Depends(require_bearer)])
     def chat(request: ChatRequest) -> ChatResponse:

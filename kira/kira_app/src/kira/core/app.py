@@ -35,6 +35,7 @@ from kira.openart.prompt_builder import OpenArtPromptBuilder
 from kira.plugins.plugin_manager import PluginManager
 from kira.profile.store import ProfileStore
 from kira.scheduler.scheduler import Scheduler
+from kira.services.update_service import UpdateService
 from kira.telemetry.store import TelemetryStore
 from kira.voice.providers import ElevenLabsVoiceProvider
 
@@ -131,6 +132,7 @@ class KiraApplication:
             data_dir=settings.data_dir,
             config_dir=settings.config_dir,
         )
+        self.update_service = UpdateService(settings.root_dir)
         self.plugin_manager = PluginManager(
             plugins_dir=settings.plugins_dir,
             config_dir=settings.plugin_config_dir,
