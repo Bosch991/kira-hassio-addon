@@ -21,6 +21,9 @@ from PySide6.QtWidgets import (
 
 from kira.desktop.dashboard import DesktopCommandResult, DesktopDashboardController
 
+PET_CELL_WIDTH = 192
+PET_CELL_HEIGHT = 208
+
 
 class CompanionMood(StrEnum):
     """Supported visual companion states."""
@@ -98,6 +101,27 @@ class CompanionSettingsStore:
         return None
 
 
+def default_companion_pet_path() -> Path | None:
+    """Return the default Codex pet path when Kira's pet exists."""
+    path = Path.home() / ".codex" / "pets" / "kira"
+    return path if pet_spritesheet_path(path) is not None else None
+
+
+def pet_spritesheet_path(path: Path | None) -> Path | None:
+    """Resolve a pet directory or spritesheet file to a usable spritesheet."""
+    if path is None:
+        return None
+    if path.is_file() and path.suffix.lower() in {".webp", ".png"}:
+        return path
+    candidate = path / "spritesheet.webp"
+    if candidate.exists():
+        return candidate
+    candidate = path / "spritesheet.png"
+    if candidate.exists():
+        return candidate
+    return None
+
+
 class CompanionActionController:
     """Route companion actions to existing Kira desktop commands."""
 
@@ -154,6 +178,7 @@ class CompanionWindow(QWidget):
         settings: CompanionSettings,
         settings_store: CompanionSettingsStore,
         avatar_path: Path,
+        pet_path: Path | None = None,
     ) -> None:
         """Initialize the floating companion widget."""
         super().__init__()
@@ -161,6 +186,7 @@ class CompanionWindow(QWidget):
         self.settings = settings
         self.settings_store = settings_store
         self.avatar_path = avatar_path
+        self.pet_path = pet_path
         self.drag_position: QPoint | None = None
         self.mood = CompanionMood.IDLE
         self.last_message = "Kira ist bereit."
@@ -181,6 +207,7 @@ class CompanionWindow(QWidget):
     def set_mood(self, mood: CompanionMood | str) -> None:
         """Update visual mood state."""
         self.mood = CompanionMood(str(mood))
+        self._load_avatar()
         self.avatar.setProperty("mood", self.mood.value)
         self.avatar.style().unpolish(self.avatar)
         self.avatar.style().polish(self.avatar)
@@ -262,6 +289,17 @@ class CompanionWindow(QWidget):
         root.addWidget(panel)
 
     def _load_avatar(self) -> None:
+        pet_pixmap = self._pet_pixmap()
+        if pet_pixmap is not None:
+            self.avatar.setPixmap(
+                pet_pixmap.scaled(
+                    82,
+                    82,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+            return
         if self.avatar_path.exists():
             pixmap = QPixmap(str(self.avatar_path))
             if not pixmap.isNull():
@@ -275,6 +313,28 @@ class CompanionWindow(QWidget):
                 )
                 return
         self.avatar.setText("Kira")
+
+    def _pet_pixmap(self) -> QPixmap | None:
+        spritesheet = pet_spritesheet_path(self.pet_path)
+        if spritesheet is None:
+            return None
+        pixmap = QPixmap(str(spritesheet))
+        if pixmap.isNull():
+            return None
+        if pixmap.width() < PET_CELL_WIDTH or pixmap.height() < PET_CELL_HEIGHT:
+            return None
+        row = self._pet_row_for_mood()
+        y = min(row * PET_CELL_HEIGHT, pixmap.height() - PET_CELL_HEIGHT)
+        return pixmap.copy(0, y, PET_CELL_WIDTH, PET_CELL_HEIGHT)
+
+    def _pet_row_for_mood(self) -> int:
+        return {
+            CompanionMood.IDLE: 0,
+            CompanionMood.THINKING: 7,
+            CompanionMood.SPEAKING: 3,
+            CompanionMood.WARNING: 5,
+            CompanionMood.HAPPY: 3,
+        }[self.mood]
 
     def _show_context_menu(self, point: QPoint) -> None:
         menu = QMenu(self)

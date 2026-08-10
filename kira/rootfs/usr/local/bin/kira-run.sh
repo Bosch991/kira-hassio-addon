@@ -30,6 +30,10 @@ export HOMEASSISTANT_URL=http://supervisor/core
 
 eval "$(/usr/local/bin/kira-options-to-env.py)"
 
+if [[ -z "${HOMEASSISTANT_TOKEN:-}" && -n "${SUPERVISOR_TOKEN:-}" ]]; then
+  export HOMEASSISTANT_TOKEN="${SUPERVISOR_TOKEN}"
+fi
+
 mkdir -p \
   /data/audio \
   /data/config \
@@ -75,6 +79,8 @@ PY
 if [[ -z "${KIRA_API_TOKEN:-}" ]]; then
   echo "[WARN] KIRA_API_TOKEN ist leer. /chat und /assist werden POST-Anfragen ablehnen."
 fi
+
+/usr/local/bin/kira-addon-preflight.py
 
 echo "[INFO] Starte Kira Add-on auf Port ${KIRA_API_PORT}"
 exec python3 -m kira server

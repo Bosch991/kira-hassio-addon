@@ -83,6 +83,10 @@ class HomeAssistantClient:
         """Call GET /api/states."""
         return self._request("GET", "/api/states")
 
+    def services(self) -> HomeAssistantResult:
+        """Call GET /api/services."""
+        return self._request("GET", "/api/services")
+
     def entity(self, entity_id: str) -> HomeAssistantResult:
         """Call GET /api/states/{entity_id}."""
         return self._request("GET", f"/api/states/{entity_id}")

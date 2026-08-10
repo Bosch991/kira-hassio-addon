@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import shlex
+import sys
 from pathlib import Path
 
 OPTIONS_PATH = Path("/data/options.json")
@@ -31,8 +32,17 @@ def main() -> None:
     if not OPTIONS_PATH.exists():
         return
 
-    options = json.loads(OPTIONS_PATH.read_text(encoding="utf-8"))
+    try:
+        options = json.loads(OPTIONS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"[WARN] Add-on options konnten nicht gelesen werden: {exc}",
+            file=sys.stderr,
+        )
+        return
+
     if not isinstance(options, dict):
+        print("[WARN] Add-on options sind kein JSON-Objekt.", file=sys.stderr)
         return
 
     for option_name, env_name in OPTION_ENV_MAP.items():

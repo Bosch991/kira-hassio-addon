@@ -28,6 +28,9 @@ Schnellbuttons, Healthcheck-Ansicht, Update-Status und erweitertem Tray-Menue.
 Version `1.9.0` ergaenzt einen kleinen Floating Desktop Companion mit
 Always-on-top-Fenster, Sprechblase, Kira-Avatar, Kontextmenue und
 Schnellaktionen.
+Der aktuelle Hassio-Stabilitaetsausbau ergaenzt Add-on-Preflight,
+Container-Healthcheck, Home-Assistant-Watchdog und den Diagnose-Endpunkt
+`GET /addon/status`.
 
 ## Installation
 
@@ -66,6 +69,11 @@ Token.
 
 Details: `docs/hassio_addon.md`.
 
+Wichtige Status-Endpunkte im Add-on:
+
+- `GET http://<HA-IP>:8787/health`
+- `GET http://<HA-IP>:8787/addon/status`
+
 ## Konfiguration
 
 Kira liest `.env` und lokale Dateien unter `config/`.
@@ -98,6 +106,7 @@ KIRA_COMPANION_SHOW_ON_START=true
 KIRA_COMPANION_ALWAYS_ON_TOP=true
 KIRA_COMPANION_BUBBLE_AUTO_HIDE=true
 KIRA_COMPANION_SIZE=small
+KIRA_COMPANION_PET_PATH=C:\Users\<name>\.codex\pets\kira
 LOG_LEVEL=INFO
 ```
 
@@ -207,8 +216,10 @@ Vorbereitete Companion-Zustaende:
 - `happy`
 
 Wenn `assets/avatar/kira.png` fehlt, nutzt Kira eine saubere Platzhalterfigur.
-Die Position wird lokal unter `data/desktop/companion_settings.json`
-gespeichert.
+Wenn `KIRA_COMPANION_PET_PATH` gesetzt ist oder lokal `~/.codex/pets/kira`
+existiert, nutzt der Companion das Codex-Pet-Spritesheet und zeigt passende
+Zellen fuer `idle`, `thinking`, `speaking`, `warning` und `happy`. Die Position
+wird lokal unter `data/desktop/companion_settings.json` gespeichert.
 
 ## Chat-Kommandos
 
@@ -256,8 +267,19 @@ gespeichert.
 - `/ha media alexa`
 - `/ha find <suchtext>`, `/ha room <raumname>`, `/ha export`
 - `/ha live start|stop|status|events|clear`
+- `/ha services [domain]`
 - `/ha entity <entity_id>`
 - `/ha service <domain> <service> <entity_id>`
+- `/ha call <domain> <service> [json]`
+
+`/ha call` ist der generische Kontrollbefehl fuer Home Assistant. Beispiel:
+
+```text
+/ha call climate set_temperature {"entity_id":"climate.wohnzimmer","temperature":21}
+```
+
+Kira kann damit alle Home-Assistant-Service-Domains ansprechen. Riskante
+Domains werden nicht automatisch ueber natuerliche Sprache geschaltet.
 
 Natuerliche Assist-Schaltbefehle laufen ueber Sicherheitsregeln: harmlose
 Licht-, Medienlautstaerke- und Fan-Aktionen duerfen automatisch laufen, riskante

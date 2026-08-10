@@ -9,6 +9,15 @@
 - Kontextmenue und Tray-Anbindung fuer Anzeigen/Ausblenden
 - lokale Companion-Einstellungen mit gespeicherter Position
 
+## 1.9.x Home Assistant Add-on Stabilitaet
+
+- Add-on-Preflight fuer Tokens und persistente Schreibrechte
+- Docker-Healthcheck gegen Kira `/health`
+- Home-Assistant-Add-on-Watchdog und Web-UI-Link
+- Diagnose-Endpunkt `GET /addon/status` ohne Secrets
+- robuster Add-on-Optionsparser ohne Python-Traceback bei defektem JSON
+- volle explizite Home-Assistant-Kontrolle ueber `/ha services` und `/ha call`
+
 ## 1.8.0 Desktop-Komfort
 
 - Dashboard mit Statuskarten fuer Kira, Server, Home Assistant, OpenAI, Voice,

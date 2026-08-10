@@ -17,6 +17,7 @@ from kira.desktop.companion import (
     CompanionMood,
     CompanionSettingsStore,
     CompanionWindow,
+    default_companion_pet_path,
 )
 from kira.desktop.dashboard import DesktopCommandResult, DesktopDashboardController
 from kira.desktop.status_widget import (
@@ -205,6 +206,7 @@ class KiraMainWindow(QMainWindow):
             settings=settings,
             settings_store=self.companion_settings_store,
             avatar_path=self._avatar_path(),
+            pet_path=self._companion_pet_path(),
         )
         companion.action_requested.connect(self._run_quick_action)
         companion.open_requested.connect(self._show_main_window)
@@ -299,6 +301,14 @@ class KiraMainWindow(QMainWindow):
         if path.is_absolute():
             return path
         return self.kira_app.settings.root_dir / path
+
+    def _companion_pet_path(self) -> Path | None:
+        path = self.kira_app.settings.companion_pet_path
+        if path is not None:
+            if path.is_absolute():
+                return path
+            return self.kira_app.settings.root_dir / path
+        return default_companion_pet_path()
 
     def _apply_theme(self) -> None:
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)

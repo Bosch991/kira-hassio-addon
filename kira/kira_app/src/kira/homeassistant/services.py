@@ -28,6 +28,10 @@ class HomeAssistantServices:
         """Call ``<domain>.toggle`` for one entity."""
         return self.call(domain, "toggle", {"entity_id": entity_id})
 
+    def list_services(self) -> HomeAssistantResult:
+        """Return services exposed by Home Assistant."""
+        return self.client.services()
+
     def call(
         self,
         domain: str,

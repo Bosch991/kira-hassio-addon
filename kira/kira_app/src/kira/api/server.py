@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from kira.addon import AddonDiagnosticsService
 from kira.chat.session import ChatSession
 from kira.core.app import KiraApplication
 from kira.version import KIRA_VERSION
@@ -65,6 +66,16 @@ def create_api(app: KiraApplication) -> Any:
 
     api = FastAPI(title="Kira Platform API", version=KIRA_VERSION)
 
+    def collect_plugin_health() -> tuple[bool, dict[str, bool], dict[str, str]]:
+        """Collect plugin health without letting diagnostics break /health."""
+        try:
+            results = app.plugin_manager.health()
+        except Exception as exc:  # pragma: no cover - defensive runtime guard
+            return False, {"plugin_manager": False}, {"plugin_manager": str(exc)}
+        plugins = {name: result.ok for name, result in results.items()}
+        details = {name: result.message for name, result in results.items()}
+        return all(plugins.values()), plugins, details
+
     def require_bearer(authorization: str | None = Header(default=None)) -> None:
         expected = app.settings.api_token
         if not expected:
@@ -85,17 +96,27 @@ def create_api(app: KiraApplication) -> Any:
 
     @api.get("/health")
     def health() -> dict[str, object]:
+        plugins_ok, plugins, details = collect_plugin_health()
+        addon = AddonDiagnosticsService(app.settings).collect()
         return {
-            "ok": True,
+            "ok": plugins_ok and addon.ok,
             "version": KIRA_VERSION,
-            "plugins": {
-                name: result.ok for name, result in app.plugin_manager.health().items()
-            },
+            "addon": addon.ok,
+            "plugins": plugins,
+            "details": details,
         }
 
     @api.get("/version")
     def version() -> dict[str, str]:
         return {"version": KIRA_VERSION}
+
+    @api.get("/addon/status")
+    def addon_status() -> dict[str, object]:
+        return (
+            AddonDiagnosticsService(app.settings)
+            .collect(check_homeassistant=True)
+            .as_dict()
+        )
 
     @api.get("/plugins")
     def plugins() -> list[dict[str, object]]:

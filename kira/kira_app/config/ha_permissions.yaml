@@ -1,13 +1,5 @@
-allowed_domains:
-  - light
-  - media_player
-  - fan
-  - scene
-  - switch
-  - cover
-  - climate
-  - automation
-  - script
+# Empty means: all Home Assistant domains are allowed for explicit CLI calls.
+allowed_domains: []
 
 allowed_rooms:
   - kueche
@@ -41,10 +33,18 @@ require_confirm:
   - climate.set_temperature
   - automation.turn_off
   - script.turn_on
-
-always_block:
+  - homeassistant.restart
+  - homeassistant.stop
+  - lock.lock
   - lock.unlock
+  - alarm_control_panel.alarm_arm_away
+  - alarm_control_panel.alarm_arm_home
   - alarm_control_panel.alarm_disarm
+  - update.install
+
+# Empty means: nothing is hard-blocked, but risky services still require
+# explicit commands and/or confirmation handling.
+always_block: []
 
 risk_levels:
   low:
@@ -58,8 +58,12 @@ risk_levels:
     - automation
     - script
   high:
+    - homeassistant
     - lock
     - alarm_control_panel
+    - siren
+    - update
+    - button
 
 confirm_rules:
   require_confirm_for_multiple_rooms: true

@@ -83,17 +83,7 @@ class HomeAssistantPermissionConfig:
     def default(cls) -> HomeAssistantPermissionConfig:
         """Return safe default permissions."""
         return cls(
-            allowed_domains={
-                "light",
-                "media_player",
-                "fan",
-                "scene",
-                "switch",
-                "cover",
-                "climate",
-                "automation",
-                "script",
-            },
+            allowed_domains=set(),
             allowed_rooms={
                 "kueche",
                 "esszimmer",
@@ -122,15 +112,27 @@ class HomeAssistantPermissionConfig:
                 "climate.set_temperature",
                 "automation.turn_off",
                 "script.turn_on",
-            },
-            always_block={
+                "homeassistant.restart",
+                "homeassistant.stop",
+                "lock.lock",
                 "lock.unlock",
+                "alarm_control_panel.alarm_arm_away",
+                "alarm_control_panel.alarm_arm_home",
                 "alarm_control_panel.alarm_disarm",
+                "update.install",
             },
+            always_block=set(),
             risk_levels={
                 "low": {"light", "media_player", "fan"},
                 "medium": {"switch", "cover", "climate", "automation", "script"},
-                "high": {"lock", "alarm_control_panel"},
+                "high": {
+                    "alarm_control_panel",
+                    "button",
+                    "homeassistant",
+                    "lock",
+                    "siren",
+                    "update",
+                },
             },
         )
 

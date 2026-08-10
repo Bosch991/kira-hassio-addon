@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -540,8 +541,9 @@ class ChatSession:
                 "/ha status, /ha summary, /ha lights, /ha on, /ha unavailable, "
                 "/ha find <suchtext>, /ha export, /ha room <raumname>, "
                 "/ha media, /ha live start|stop|status|events|clear, "
-                "/ha entity <entity_id>, "
-                "/ha service <domain> <service> <entity_id>"
+                "/ha services [domain], /ha entity <entity_id>, "
+                "/ha service <domain> <service> <entity_id>, "
+                "/ha call <domain> <service> [json]"
             )
             return
 
@@ -561,6 +563,10 @@ class ChatSession:
             return
         if command == "states":
             self._show_ha_states(self.homeassistant.states())
+            return
+        if command == "services":
+            domain = parts[1] if len(parts) >= 2 else None
+            self._show_ha_services(domain=domain)
             return
         if command == "status":
             self._show_home_status()
@@ -628,6 +634,9 @@ class ChatSession:
                     entity_id=parts[3],
                 )
             )
+            return
+        if command == "call" and len(parts) >= 3:
+            self._handle_ha_call(parts)
             return
 
         self._respond("Home-Assistant-Befehl unvollstaendig. Nutze /ha fuer Hilfe.")
@@ -1014,6 +1023,95 @@ class ChatSession:
                 state = item.get("state", "unknown")
                 self.console.print(f"  {entity_id}: {state}")
                 self._write_session_line("kira", f"{entity_id}: {state}")
+
+    def _show_ha_services(self, *, domain: str | None = None) -> None:
+        result = self.homeassistant_services.list_services()
+        if not result.ok:
+            self._respond(self._ha_error_message(result))
+            return
+        if not isinstance(result.data, list):
+            self._respond("Home Assistant lieferte keine Service-Liste.")
+            return
+
+        services_by_domain = self._ha_services_by_domain(result.data)
+        if domain:
+            names = services_by_domain.get(domain)
+            if not names:
+                self._respond(f"Keine Services fuer Domain `{domain}` gefunden.")
+                return
+            self._respond(f"Home-Assistant-Services fuer `{domain}`: {len(names)}")
+            for name in names[:40]:
+                self.console.print(f"  {domain}.{name}")
+                self._write_session_line("kira", f"{domain}.{name}")
+            return
+
+        self._respond(
+            f"Home-Assistant-Service-Domains: {len(services_by_domain)} Treffer."
+        )
+        for domain_name, names in list(services_by_domain.items())[:40]:
+            sample = ", ".join(names[:5])
+            line = f"{domain_name}: {len(names)} Services ({sample})"
+            self.console.print(f"  {line}")
+            self._write_session_line("kira", line)
+
+    def _handle_ha_call(self, parts: list[str]) -> None:
+        domain = parts[1]
+        service = parts[2]
+        payload_text = " ".join(parts[3:]).strip()
+        try:
+            payload = self._parse_ha_call_payload(payload_text)
+        except ValueError as exc:
+            self._respond(str(exc))
+            return
+
+        permission = self.ha_permissions.evaluate(
+            domain=domain,
+            service=service,
+            entity_ids=self._entity_ids_from_payload(payload),
+        )
+        if permission.decision is PermissionDecision.BLOCK:
+            self._respond("Das ist in der HA-Permission-Konfiguration blockiert.")
+            return
+        if permission.decision is PermissionDecision.REQUIRE_CONFIRM:
+            self._respond(
+                "Expliziter HA-Call wird ausgefuehrt "
+                f"(Risiko: {permission.risk_level.value}, Grund: {permission.reason})."
+            )
+        self._show_ha_result(self.homeassistant_services.call(domain, service, payload))
+
+    def _parse_ha_call_payload(self, payload_text: str) -> dict[str, Any]:
+        if not payload_text:
+            return {}
+        try:
+            payload = json.loads(payload_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "Payload muss gueltiges JSON sein. Beispiel: "
+                '/ha call light turn_on {"entity_id":"light.kueche"}'
+            ) from exc
+        if not isinstance(payload, dict):
+            raise ValueError("Payload muss ein JSON-Objekt sein.")
+        return payload
+
+    def _entity_ids_from_payload(self, payload: dict[str, Any]) -> list[str]:
+        entity_id = payload.get("entity_id")
+        if isinstance(entity_id, str):
+            return [entity_id]
+        if isinstance(entity_id, list):
+            return [str(item) for item in entity_id if item is not None]
+        return []
+
+    def _ha_services_by_domain(self, services: list[object]) -> dict[str, list[str]]:
+        services_by_domain: dict[str, list[str]] = {}
+        for item in services:
+            if not isinstance(item, dict):
+                continue
+            domain = item.get("domain")
+            service_map = item.get("services")
+            if not isinstance(domain, str) or not isinstance(service_map, dict):
+                continue
+            services_by_domain[domain] = sorted(str(name) for name in service_map)
+        return dict(sorted(services_by_domain.items()))
 
     def _show_ha_media_players(self, *, alexa_only: bool = False) -> None:
         result = self.homeassistant.states()

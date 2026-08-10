@@ -15,6 +15,23 @@ muss fuer Assist, Home-Assistant-Steuerung, Memory, Knowledge und
 Die Home-Assistant-API wird intern ueber den Supervisor genutzt. Es ist kein
 Long-Lived Access Token noetig.
 
+## Stabilitaet
+
+Beim Start prueft Kira:
+
+- Supervisor-Token fuer Home Assistant
+- Schreibrechte unter `/data`
+- Kira API Token
+- Media Base URL fuer `media_player`-Ausgabe
+
+Der Container hat einen Healthcheck auf `/health`. Fuer Details:
+
+- `http://<HA-IP>:8787/health`
+- `http://<HA-IP>:8787/addon/status`
+
+`/addon/status` prueft auch `homeassistant_api`. Dieser Check zeigt, ob Kira
+ueber den Supervisor wirklich auf Home Assistant Core zugreifen kann.
+
 ## Persistenz
 
 Kira speichert Daten unter `/data`:

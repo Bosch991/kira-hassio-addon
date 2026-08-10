@@ -86,6 +86,10 @@ class Settings(BaseSettings):
         alias="KIRA_COMPANION_BUBBLE_AUTO_HIDE",
     )
     companion_size: str = Field(default="small", alias="KIRA_COMPANION_SIZE")
+    companion_pet_path: Path | None = Field(
+        default=None,
+        alias="KIRA_COMPANION_PET_PATH",
+    )
 
     root_dir: Path = Field(default_factory=project_root, alias="KIRA_ROOT_DIR")
     data_dir: Path | None = Field(default=None, alias="KIRA_DATA_DIR")

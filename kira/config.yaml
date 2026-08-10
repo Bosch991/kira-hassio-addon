@@ -11,6 +11,8 @@ startup: services
 boot: auto
 init: false
 homeassistant_api: true
+webui: "http://[HOST]:[PORT:8787]"
+watchdog: "http://[HOST]:[PORT:8787]/health"
 map:
   - addon_config:rw
 ports:
