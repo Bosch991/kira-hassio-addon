@@ -1,3 +1,3 @@
-﻿"""Kira version metadata."""
+"""Kira version metadata."""
 
-KIRA_VERSION = "1.9.0"
+KIRA_VERSION = "1.9.1"

@@ -1,6 +1,6 @@
 # Kira
 
-Kira `1.9.0` ist eine lokale, modulare Assistenten-Plattform. Die bisherigen
+Kira `1.9.1` ist eine lokale, modulare Assistenten-Plattform. Die bisherigen
 Funktionen bleiben erhalten: Terminal-Chat, OpenAI-Fallback, Home Assistant,
 Voice, Audio-Routing, Memory, Knowledge und Live-Events. Neu ist die
 Plattformschicht: Plugins, Event-Bus, Scheduler-Infrastruktur, API,
@@ -25,7 +25,7 @@ Version `1.7.0` ergaenzt Update- und Deployment-Komfort fuer lokale Git-
 Checkouts und den Home-Assistant-Add-on-Betrieb.
 Version `1.8.0` ergaenzt Desktop-Komfort mit Dashboard, Statuskarten,
 Schnellbuttons, Healthcheck-Ansicht, Update-Status und erweitertem Tray-Menue.
-Version `1.9.0` ergaenzt einen kleinen Floating Desktop Companion mit
+Version `1.9.1` ergaenzt einen kleinen Floating Desktop Companion mit
 Always-on-top-Fenster, Sprechblase, Kira-Avatar, Kontextmenue und
 Schnellaktionen.
 Der aktuelle Hassio-Stabilitaetsausbau ergaenzt Add-on-Preflight,
@@ -190,7 +190,7 @@ nicht angezeigt.
 
 ## Desktop Companion
 
-Kira `1.9.0` startet in der Desktop-App optional einen kleinen Floating
+Kira `1.9.1` startet in der Desktop-App optional einen kleinen Floating
 Assistant. Der Companion ist ein leichtgewichtiges, verschiebbares Fenster mit
 transparentem Hintergrund, Always-on-top-Modus, Kira-Avatar, kurzer
 Sprechblase und Schnellaktionen.

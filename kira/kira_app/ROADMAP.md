@@ -9,7 +9,7 @@
 - Kontextmenue und Tray-Anbindung fuer Anzeigen/Ausblenden
 - lokale Companion-Einstellungen mit gespeicherter Position
 
-## 1.9.x Home Assistant Add-on Stabilitaet
+## 1.9.1 Home Assistant Add-on Stabilitaet
 
 - Add-on-Preflight fuer Tokens und persistente Schreibrechte
 - Docker-Healthcheck gegen Kira `/health`
