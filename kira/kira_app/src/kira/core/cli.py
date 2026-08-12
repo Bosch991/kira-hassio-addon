@@ -33,28 +33,30 @@ def main(argv: list[str] | None = None) -> None:
 
     app = create_app()
     app.start()
+    try:
+        if args.command == "chat":
+            ChatSession.from_app(app).run()
+            return
 
-    if args.command == "chat":
-        ChatSession.from_app(app).run()
-        return
+        if args.command in {"api", "server"}:
+            import uvicorn
 
-    if args.command in {"api", "server"}:
-        import uvicorn
+            from kira.api.server import create_api
 
-        from kira.api.server import create_api
+            uvicorn.run(
+                create_api(app),
+                host=app.settings.api_host,
+                port=app.settings.api_port,
+            )
+            return
 
-        uvicorn.run(
-            create_api(app),
-            host=app.settings.api_host,
-            port=app.settings.api_port,
-        )
-        return
+        if args.command == "desktop":
+            from kira.desktop.app import run_desktop_app
 
-    if args.command == "desktop":
-        from kira.desktop.app import run_desktop_app
+            raise SystemExit(run_desktop_app(app))
 
-        raise SystemExit(run_desktop_app(app))
-
-    logger = logging.getLogger(__name__)
-    logger.info("Kira started successfully.")
-    logger.info("Memory store: %s", app.memory.path)
+        logger = logging.getLogger(__name__)
+        logger.info("Kira started successfully.")
+        logger.info("Memory store: %s", app.memory.path)
+    finally:
+        app.stop()

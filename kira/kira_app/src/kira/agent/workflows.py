@@ -71,9 +71,16 @@ class WorkflowPlanningResult(BaseModel):
 class WorkflowEngine:
     """Prefer existing HA workflows, then build configured fallback plans."""
 
-    def __init__(self, path: Path, *, entity_resolver: EntityResolver) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        entity_resolver: EntityResolver,
+        defaults_path: Path | None = None,
+    ) -> None:
         """Initialize workflow configuration and entity resolver."""
         self.path = path
+        self.defaults_path = defaults_path
         self.entity_resolver = entity_resolver
         self.document = WorkflowDocument()
         self.logger = logging.getLogger(__name__)
@@ -82,7 +89,7 @@ class WorkflowEngine:
     def reload(self) -> None:
         """Reload workflow definitions from disk."""
         if not self.path.exists():
-            self.document = WorkflowDocument()
+            self.document = self._load_defaults() or WorkflowDocument()
             return
         try:
             payload = yaml.safe_load(self.path.read_text(encoding="utf-8")) or {}
@@ -90,7 +97,50 @@ class WorkflowEngine:
         except (OSError, yaml.YAMLError, ValidationError) as exc:
             self.logger.warning("Agent workflows could not be reloaded: %s", exc)
             return
-        self.document = document
+        defaults = self._load_defaults()
+        self.document = (
+            self._merge_older_document(document, defaults)
+            if defaults is not None and document.version < defaults.version
+            else document
+        )
+
+    def _load_defaults(self) -> WorkflowDocument | None:
+        """Load packaged defaults when separate from the active config file."""
+        path = self.defaults_path
+        if path is None or not path.exists() or _same_path(path, self.path):
+            return None
+        try:
+            payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            return WorkflowDocument.model_validate(payload)
+        except (OSError, yaml.YAMLError, ValidationError) as exc:
+            self.logger.warning("Default agent workflows could not be loaded: %s", exc)
+            return None
+
+    def _merge_older_document(
+        self,
+        document: WorkflowDocument,
+        defaults: WorkflowDocument,
+    ) -> WorkflowDocument:
+        """Add new defaults to an older config without replacing user values."""
+        merged = document.model_copy(deep=True)
+        for key, default in defaults.workflows.items():
+            current = merged.workflows.get(key)
+            if current is None:
+                merged.workflows[key] = default.model_copy(deep=True)
+                continue
+            current.aliases = _ordered_union(current.aliases, default.aliases)
+            current.preferred_ha_terms = _ordered_union(
+                current.preferred_ha_terms,
+                default.preferred_ha_terms,
+            )
+            signatures = {_step_signature(step) for step in current.fallback_steps}
+            current.fallback_steps.extend(
+                step.model_copy(deep=True)
+                for step in default.fallback_steps
+                if _step_signature(step) not in signatures
+            )
+        merged.version = defaults.version
+        return merged
 
     @property
     def aliases(self) -> dict[str, tuple[str, ...]]:
@@ -380,6 +430,26 @@ def _supports_data(entity: EntityDescriptor, data: dict[str, Any]) -> bool:
     if "color_temp_kelvin" in data:
         return "color_temperature" in entity.capabilities
     return True
+
+
+def _same_path(left: Path, right: Path) -> bool:
+    """Compare configuration paths without requiring either path to exist."""
+    return left.resolve(strict=False) == right.resolve(strict=False)
+
+
+def _ordered_union(current: list[str], defaults: list[str]) -> list[str]:
+    """Append only missing default strings while retaining user ordering."""
+    return list(dict.fromkeys([*current, *defaults]))
+
+
+def _step_signature(step: WorkflowStepDefinition) -> tuple[object, ...]:
+    """Identify a workflow action while allowing user payload customization."""
+    return (
+        step.action,
+        normalize_text(step.target),
+        tuple(sorted(step.domains)),
+        normalize_text(step.room or ""),
+    )
 
 
 def _finite_number(value: Any) -> float | None:

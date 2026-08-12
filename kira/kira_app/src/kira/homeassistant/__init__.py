@@ -35,6 +35,11 @@ from kira.homeassistant.permissions import (
     PermissionDecision,
     RiskLevel,
 )
+from kira.homeassistant.registry import (
+    HomeAssistantRegistryAdapter,
+    HomeAssistantRegistrySnapshot,
+    HomeAssistantRegistryWebSocketClient,
+)
 from kira.homeassistant.services import HomeAssistantServices
 from kira.homeassistant.status import (
     HomeBriefingResult,
@@ -72,6 +77,9 @@ __all__ = [
     "HomeAssistantPermissionEngine",
     "HomeAssistantPermissionResult",
     "HomeAssistantResult",
+    "HomeAssistantRegistryAdapter",
+    "HomeAssistantRegistrySnapshot",
+    "HomeAssistantRegistryWebSocketClient",
     "HomeAssistantServices",
     "HomeAssistantStatus",
     "HomeAssistantSummary",

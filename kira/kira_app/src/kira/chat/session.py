@@ -562,11 +562,17 @@ class ChatSession:
         )
 
     def reload_context(self) -> None:
-        """Reload personality prompt and knowledge files from disk."""
+        """Reload prompts, knowledge, and configurable agent semantics."""
         self.system_prompt = load_system_prompt(self.settings)
         self.knowledge.reload()
         if self.homeassistant_agent is not None:
             self.homeassistant_agent.planner.workflow_engine.reload()
+            goal_runtime = self.homeassistant_agent.goal_runtime
+            if goal_runtime is not None:
+                goal_runtime.resolver.reload()
+            registry = self.homeassistant_agent.world.registry_adapter
+            if registry is not None:
+                registry.reload_relationships()
 
     def _handle_homeassistant(self, command_text: str) -> None:
         parts = command_text.split()

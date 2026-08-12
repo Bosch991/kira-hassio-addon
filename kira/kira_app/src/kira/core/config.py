@@ -161,6 +161,30 @@ class Settings(BaseSettings):
         default=None,
         alias="KIRA_AGENT_WORKFLOWS_PATH",
     )
+    agent_goals_path: Path | None = Field(
+        default=None,
+        alias="KIRA_AGENT_GOALS_PATH",
+    )
+    agent_goal_history_path: Path | None = Field(
+        default=None,
+        alias="KIRA_AGENT_GOAL_HISTORY_PATH",
+    )
+    agent_preferences_path: Path | None = Field(
+        default=None,
+        alias="KIRA_AGENT_PREFERENCES_PATH",
+    )
+    agent_tasks_path: Path | None = Field(
+        default=None,
+        alias="KIRA_AGENT_TASKS_PATH",
+    )
+    entity_relationships_path: Path | None = Field(
+        default=None,
+        alias="KIRA_ENTITY_RELATIONSHIPS_PATH",
+    )
+    ha_registry_cache_seconds: float = Field(
+        default=300.0,
+        alias="KIRA_HA_REGISTRY_CACHE_SECONDS",
+    )
     profile_path: Path | None = Field(default=None, alias="KIRA_PROFILE_PATH")
     telemetry_path: Path | None = Field(default=None, alias="KIRA_TELEMETRY_PATH")
     openart_dir: Path | None = Field(default=None, alias="KIRA_OPENART_DIR")
@@ -216,6 +240,22 @@ class Settings(BaseSettings):
             )
         if self.agent_workflows_path is None:
             self.agent_workflows_path = self.config_dir / "agent_workflows.yaml"
+        if self.agent_goals_path is None:
+            self.agent_goals_path = self.config_dir / "agent_goals.yaml"
+        if self.agent_goal_history_path is None:
+            self.agent_goal_history_path = (
+                self.data_dir / "homeassistant" / "goal_history.json"
+            )
+        if self.agent_preferences_path is None:
+            self.agent_preferences_path = (
+                self.data_dir / "homeassistant" / "preferences.json"
+            )
+        if self.agent_tasks_path is None:
+            self.agent_tasks_path = self.data_dir / "homeassistant" / "tasks.json"
+        if self.entity_relationships_path is None:
+            self.entity_relationships_path = (
+                self.config_dir / "entity_relationships.yaml"
+            )
         if self.profile_path is None:
             self.profile_path = self.data_dir / "profile.json"
         if self.telemetry_path is None:

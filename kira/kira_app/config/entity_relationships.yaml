@@ -1,0 +1,5 @@
+version: 1
+
+# Optional semantics that are not represented by Home Assistant's registries.
+# Registry placement always wins over configured room data.
+entities: {}

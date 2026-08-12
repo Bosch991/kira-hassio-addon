@@ -52,8 +52,13 @@ _ACTION_ALIASES: Mapping[ActionType, tuple[str, ...]] = {
     ),
     ActionType.OPEN: ("oeffnen", "mach auf", "aufmachen"),
     ActionType.CLOSE: ("schliessen", "mach zu", "zumachen"),
-    ActionType.LOCK: ("abschliessen", "verriegeln"),
-    ActionType.UNLOCK: ("aufschliessen", "entriegeln"),
+    ActionType.LOCK: ("abschliessen", "verriegeln", "verriegle", "schliesse ab"),
+    ActionType.UNLOCK: (
+        "aufschliessen",
+        "entriegeln",
+        "entriegle",
+        "schliesse auf",
+    ),
     ActionType.PLAY: ("abspielen", "weiterspielen"),
     ActionType.PAUSE: ("pausieren", "pause"),
     ActionType.STOP: ("stoppen", "stopp"),
@@ -328,8 +333,17 @@ class OpenAIIntentInterpreter:
                 "previous_entities": context.previous_entities,
                 "previous_intent": previous_intent,
                 "has_pending_plan": context.pending_plan is not None,
+                "has_pending_task": context.pending_task_id is not None,
             },
-            "available_entities": catalog.model_context(),
+            "context_fusion": {
+                key: value
+                for key, value in catalog.semantic_context.items()
+                if key != "relevant_entities"
+            },
+            "available_entities": catalog.semantic_context.get(
+                "relevant_entities",
+                catalog.model_context(),
+            ),
         }
 
 
@@ -356,7 +370,8 @@ class LocalIntentResolver:
         """Interpret common requests without network access."""
         text = normalize_text(message).strip(" .!?")
         if text in _EXPLICIT_CONFIRM_PHRASES or (
-            context.pending_plan is not None and text in _CONFIRM_PHRASES
+            (context.pending_plan is not None or context.pending_task_id is not None)
+            and text in _CONFIRM_PHRASES
         ):
             return AgentIntent(
                 kind=IntentKind.CONFIRM,
@@ -365,7 +380,8 @@ class LocalIntentResolver:
                 rationale="Explizite Bestaetigung",
             )
         if text in _EXPLICIT_CANCEL_PHRASES or (
-            context.pending_plan is not None and text in _CANCEL_PHRASES
+            (context.pending_plan is not None or context.pending_task_id is not None)
+            and text in _CANCEL_PHRASES
         ):
             return AgentIntent(
                 kind=IntentKind.CANCEL,

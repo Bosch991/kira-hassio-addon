@@ -141,6 +141,13 @@ class PlanSafetyManager:
 
         decision = _strictest_decision(decisions)
         risk = _highest_risk(risks)
+        if plan.confidence < 0.55:
+            decision = PermissionDecision.BLOCK
+            reasons.append("plan_confidence_too_low")
+        elif plan.confidence < 0.8 and risk is not RiskLevel.LOW:
+            decisions.append(PermissionDecision.REQUIRE_CONFIRM)
+            reasons.append("low_confidence_risky_plan")
+            decision = _strictest_decision(decisions)
         review = PlanSafetyReview(decision, risk, tuple(dict.fromkeys(reasons)))
         self.logger.info(
             "Agent plan safety: plan=%s decision=%s risk=%s reasons=%s",

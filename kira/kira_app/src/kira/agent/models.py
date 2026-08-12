@@ -155,6 +155,8 @@ class ActionPlan(BaseModel):
     intent: str
     steps: list[PlanStep]
     explanation: str
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    goal_id: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
     expires_at: datetime | None = None
 
@@ -177,6 +179,9 @@ class ConversationContext(BaseModel):
     pending_plan: ActionPlan | None = None
     pending_user: str | None = None
     pending_source: str | None = None
+    pending_task_id: str | None = None
+    pending_task_user: str | None = None
+    pending_task_source: str | None = None
 
 
 class ConversationContextDocument(BaseModel):

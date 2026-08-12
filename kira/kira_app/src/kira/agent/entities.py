@@ -171,7 +171,12 @@ class EntityDescriptor:
     capabilities: frozenset[str]
     tags: frozenset[str]
     attributes: dict[str, Any]
+    area_id: str | None = None
+    area_confidence: float = 0.0
+    area_source: str = "name_fallback"
+    used_for: tuple[str, ...] = ()
     related_entity_ids: tuple[str, ...] = ()
+    aliases: tuple[str, ...] = ()
 
     @property
     def search_text(self) -> str:
@@ -183,6 +188,8 @@ class EntityDescriptor:
             self.device_name or "",
             self.device_class or "",
             " ".join(sorted(self.tags)),
+            " ".join(self.used_for),
+            " ".join(self.aliases),
         ]
         return normalize_text(" ".join(values))
 
@@ -211,6 +218,7 @@ class EntityCatalog:
     """Current searchable catalog of Home Assistant entities."""
 
     entities: list[EntityDescriptor]
+    semantic_context: dict[str, Any] = field(default_factory=dict)
     by_id: dict[str, EntityDescriptor] = field(init=False)
 
     def __post_init__(self) -> None:
@@ -222,9 +230,16 @@ class EntityCatalog:
         with_relations = []
         for entity in self.entities:
             related = tuple(
-                item
-                for item in grouped.get(entity.device_id or "", [])
-                if item != entity.entity_id
+                dict.fromkeys(
+                    [
+                        *entity.related_entity_ids,
+                        *(
+                            item
+                            for item in grouped.get(entity.device_id or "", [])
+                            if item != entity.entity_id
+                        ),
+                    ]
+                )
             )
             with_relations.append(
                 EntityDescriptor(
@@ -241,7 +256,12 @@ class EntityCatalog:
                     capabilities=entity.capabilities,
                     tags=entity.tags,
                     attributes=entity.attributes,
+                    area_id=entity.area_id,
+                    area_confidence=entity.area_confidence,
+                    area_source=entity.area_source,
+                    used_for=entity.used_for,
                     related_entity_ids=related,
+                    aliases=entity.aliases,
                 )
             )
         self.entities = with_relations
@@ -274,11 +294,16 @@ class EntityCatalog:
                 "name": entity.name,
                 "domain": entity.domain,
                 "room": entity.room,
+                "area_id": entity.area_id,
+                "area_confidence": entity.area_confidence,
+                "area_source": entity.area_source,
                 "state": entity.state,
                 "device_class": entity.device_class,
                 "unit": entity.unit,
                 "capabilities": sorted(entity.capabilities),
                 "tags": sorted(entity.tags),
+                "used_for": list(entity.used_for),
+                "aliases": list(entity.aliases),
             }
             for entity in prioritized[:limit]
         ]
@@ -635,6 +660,11 @@ def _descriptor(entity: EntityView) -> EntityDescriptor:
     if not isinstance(attributes, dict):
         attributes = {}
     room = _first_text(attributes, "area_name", "area_id", "room") or entity.room
+    area_id = _first_text(attributes, "area_id")
+    area_source = _first_text(attributes, "kira_area_source") or "name_fallback"
+    area_confidence = _number(attributes.get("kira_area_confidence"))
+    if area_confidence is None:
+        area_confidence = 0.55 if room else 0.0
     device_id = _first_text(attributes, "device_id")
     device_name = _first_text(attributes, "device_name", "device")
     device_class = _first_text(attributes, "device_class")
@@ -650,6 +680,25 @@ def _descriptor(entity: EntityView) -> EntityDescriptor:
             or attributes.get("hs_color") is not None
         ):
             capabilities.add("color")
+    used_for = _strings(attributes.get("kira_used_for"))
+    aliases = tuple(
+        dict.fromkeys(
+            [
+                *_strings(attributes.get("kira_aliases")),
+                *(
+                    (registry_name,)
+                    if (
+                        registry_name := _first_text(
+                            attributes,
+                            "kira_registry_name",
+                        )
+                    )
+                    else ()
+                ),
+            ]
+        )
+    )
+    configured_relations = _strings(attributes.get("kira_related_entities"))
     tags = _semantic_tags(
         " ".join(
             value
@@ -659,6 +708,7 @@ def _descriptor(entity: EntityView) -> EntityDescriptor:
                 room or "",
                 device_name or "",
                 device_class or "",
+                " ".join(used_for),
             )
             if value
         )
@@ -677,6 +727,12 @@ def _descriptor(entity: EntityView) -> EntityDescriptor:
         capabilities=frozenset(capabilities),
         tags=frozenset(tags),
         attributes=attributes,
+        area_id=area_id,
+        area_confidence=max(0.0, min(1.0, area_confidence)),
+        area_source=area_source,
+        used_for=used_for,
+        related_entity_ids=configured_relations,
+        aliases=aliases,
     )
 
 
@@ -737,3 +793,15 @@ def _entity_ids(value: str) -> list[str]:
     return list(
         dict.fromkeys(re.findall(r"\b[a-z_]+\.[a-z0-9_]+\b", normalize_text(value)))
     )
+
+
+def _strings(value: object) -> tuple[str, ...]:
+    if not isinstance(value, list | tuple | set):
+        return ()
+    return tuple(str(item) for item in value if item is not None and str(item).strip())
+
+
+def _number(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return float(value)

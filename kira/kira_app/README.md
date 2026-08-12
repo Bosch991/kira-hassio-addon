@@ -1,11 +1,15 @@
 # Kira
 
-Kira `2.0.0` ist eine lokale, modulare Assistenten-Plattform. Terminal-Chat,
+Kira `2.1.0` ist eine lokale, modulare Assistenten-Plattform. Terminal-Chat,
 Desktop-App, OpenAI-Fallback, Home Assistant, Voice, Audio-Routing, Memory,
 Knowledge, Live-Events, Plugins, API und Backup bleiben erhalten. Neu ist ein
 kontextbewusster Home-Assistant-Agent: Er versteht freie Absichten, loest
 Ziele gegen den aktuellen Hauszustand auf, plant mehrere Schritte, prueft
 Sicherheit und Faehigkeiten und bestaetigt Ergebnisse durch erneutes Lesen.
+Die kontextuelle Intelligenzstufe `2.1.0` ergaenzt ein kompaktes
+Situationsmodell, Activities mit Confidence, konfigurierbare Goals samt
+Completion Check, explizite Praeferenzen, Registry-Beziehungen, persistente
+Wenn-dann-Tasks und erklaerbare proaktive Erkennung.
 Version `1.1.0` ergaenzt OpenArt-Bildgenerierung mit deinem bestehenden
 Kira-Modell, Kira-Style und Kira-World.
 Version `1.2.0` bereitet Kira als externen Home-Assistant-Assist-Agent vor
@@ -26,10 +30,10 @@ Version `1.7.0` ergaenzt Update- und Deployment-Komfort fuer lokale Git-
 Checkouts und den Home-Assistant-Add-on-Betrieb.
 Version `1.8.0` ergaenzt Desktop-Komfort mit Dashboard, Statuskarten,
 Schnellbuttons, Healthcheck-Ansicht, Update-Status und erweitertem Tray-Menue.
-Version `1.9.1` ergaenzt einen kleinen Floating Desktop Companion mit
+Version `1.9.0` ergaenzt einen kleinen Floating Desktop Companion mit
 Always-on-top-Fenster, Sprechblase, Kira-Avatar, Kontextmenue und
 Schnellaktionen.
-Der aktuelle Hassio-Stabilitaetsausbau ergaenzt Add-on-Preflight,
+Version `1.9.1` ergaenzt Add-on-Preflight,
 Docker-nativen Healthcheck, Supervisor-Watchdog und den Diagnose-Endpunkt
 `GET /addon/status`.
 
@@ -101,6 +105,7 @@ KIRA_AGENT_SEMANTIC_ENABLED=true
 KIRA_AGENT_CONFIRMATION_SECONDS=120
 KIRA_AGENT_VERIFICATION_ATTEMPTS=2
 KIRA_AGENT_VERIFICATION_DELAY=0.25
+KIRA_HA_REGISTRY_CACHE_SECONDS=300
 KIRA_PROACTIVE_MODE=detect
 KIRA_PROACTIVE_AUTO_EXECUTE=false
 KIRA_API_HOST=0.0.0.0
@@ -123,6 +128,9 @@ Das lokale Aktionsprotokoll liegt unter `data/homeassistant/action_log.json`.
 Agenten-Workflows liegen unter `config/agent_workflows.yaml`. Strukturierter
 Gespraechskontext wird pro Conversation unter
 `data/homeassistant/conversation_contexts.json` gespeichert.
+Goals liegen unter `config/agent_goals.yaml`, ergaenzende Beziehungen unter
+`config/entity_relationships.yaml`. Explizite Praeferenzen, Goal-History und
+Langzeit-Tasks werden getrennt unter `data/homeassistant/` gespeichert.
 
 ## Intelligenter Home-Assistant-Agent
 
@@ -131,12 +139,17 @@ Assist laufen ueber denselben Agentenpfad:
 
 ```text
 Anfrage + Benutzer-/Raumkontext
+-> Registry-angereicherter Live-Zustand
+-> SituationContext + Activities
 -> IntentResolver
+-> GoalResolver + ContextFusionEngine
+-> Goal Completion Check
 -> EntityResolver mit aktuellen HA-States
 -> WorkflowEngine und Planner
 -> planweite Sicherheitspruefung
 -> Ausfuehrung
 -> erneutes Lesen der Zielentities
+-> abschliessender Goal Completion Check
 -> kurze, belegte Antwort
 ```
 
@@ -149,6 +162,7 @@ Etwas dunkler.
 Und mach es waermer.
 Ich will einen Film schauen.
 Ich gehe schlafen.
+Wenn der Druck fertig ist, schalte den Drucker aus.
 ```
 
 Kira bevorzugt passende vorhandene Home-Assistant-Scenes, Scripts und
@@ -163,7 +177,37 @@ validiert. Bei fehlendem OpenAI-Key oder Modellfehler arbeitet ein lokaler
 Resolver fuer Basisaktionen und Zustandsfragen weiter. Proaktive automatische
 Aktionen bleiben standardmaessig deaktiviert.
 
-Details: `docs/intelligent_agent.md` und `docs/action_safety.md`.
+Details: `docs/intelligent_agent.md`, `docs/contextual_intelligence.md` und
+`docs/action_safety.md`.
+
+## Kontextuelle Intelligenz
+
+Kira sendet nicht blind den gesamten Home-Assistant-State an ein Modell.
+`SituationAnalyzer` verdichtet Praesenz, Tageszeit, aktive Raeume, Licht,
+Unterhaltung, Computer, 3D-Druck, Reinigung, Oeffnungen, Schloesser, Alarm,
+Energie und nicht verfuegbare Geraete. `ContextFusionEngine` waehlt daraus
+zusammen mit Conversation, Assist-Ursprungsraum, Goal und expliziten
+Praeferenzen nur relevante Entities aus.
+
+Ein Wunsch wie `Ich moechte einen Film schauen` wird zuerst zum Goal
+`watch_movie`. Ist TV und Filmbeleuchtung bereits passend, sendet Kira keinen
+Service Call. Andernfalls dokumentiert jeder Planschritt intern seinen Grund
+und der Zielzustand wird nach der Ausfuehrung erneut geprueft.
+
+Bedingte Auftraege werden dauerhaft nach
+`data/homeassistant/tasks.json` geschrieben:
+
+```text
+Wenn der Druck fertig ist, schalte den Drucker aus.
+Wenn die Waschmaschine fertig ist, sag mir Bescheid.
+Wenn ich nach Hause komme und es dunkel ist, mach das Licht an.
+```
+
+Die spaetere Aktion wird bei der Erstellung geplant und sicherheitsbewertet,
+aber niemals sofort ausgefuehrt. Riskante Tasks brauchen `Bestaetigen` vom
+selben Benutzer und Kanal; die Bestaetigung aktiviert nur den Task. Beim
+Live-Event werden Zustand, Plan, Berechtigung und autorisierte Entities erneut
+geprueft. Eine bereits passende Home-Assistant-Automation hat Vorrang.
 
 ## Plugins
 
@@ -241,7 +285,7 @@ nicht angezeigt.
 
 ## Desktop Companion
 
-Kira `1.9.1` startet in der Desktop-App optional einen kleinen Floating
+Kira `1.9.0` startet in der Desktop-App optional einen kleinen Floating
 Assistant. Der Companion ist ein leichtgewichtiges, verschiebbares Fenster mit
 transparentem Hintergrund, Always-on-top-Modus, Kira-Avatar, kurzer
 Sprechblase und Schnellaktionen.
@@ -371,6 +415,17 @@ Kira/
 |   `-- plugins/
 |-- src/kira/
 |   |-- agent/
+|   |   |-- activities.py
+|   |   |-- coordinator.py
+|   |   |-- fusion.py
+|   |   |-- goal_runtime.py
+|   |   |-- goals.py
+|   |   |-- preferences.py
+|   |   |-- situation.py
+|   |   |-- task_models.py
+|   |   |-- task_parser.py
+|   |   |-- task_runtime.py
+|   |   `-- task_store.py
 |   |-- api/
 |   |-- audio/
 |   |-- backup/
@@ -415,6 +470,7 @@ Weitere Details:
 - `docs/api.md`
 - `docs/homeassistant_assist.md`
 - `docs/intelligent_agent.md`
+- `docs/contextual_intelligence.md`
 - `docs/action_safety.md`
 - `docs/hassio_addon.md`
 - `docs/alexa_media.md`

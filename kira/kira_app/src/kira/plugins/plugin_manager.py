@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from enum import StrEnum
@@ -48,6 +49,7 @@ class PluginManager:
         self.config_dir = config_dir
         self.context = context
         self.records: dict[str, PluginRecord] = {}
+        self.logger = logging.getLogger(__name__)
 
     def discover(self) -> list[PluginManifest]:
         """Discover plugin manifests without starting plugins."""
@@ -134,6 +136,22 @@ class PluginManager:
             for record in self.list_plugins()
             if record.state is PluginState.ENABLED
         ]
+
+    def stop_all(self) -> None:
+        """Stop runtime instances without changing their enabled configuration."""
+        for record in self.list_plugins():
+            instance = record.instance
+            if instance is None:
+                continue
+            try:
+                instance.stop()
+                self._publish(PluginStopped(record.manifest.name))
+            except Exception as exc:
+                record.error = str(exc)
+                self.logger.exception("Plugin stop failed: %s", record.manifest.name)
+            finally:
+                record.instance = None
+                record.state = PluginState.DISABLED
 
     def health(self) -> dict[str, PluginHealth]:
         """Run healthchecks for all known plugins."""

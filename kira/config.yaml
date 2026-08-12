@@ -1,5 +1,5 @@
 name: Kira
-version: "2.0.0"
+version: "2.1.0"
 slug: kira
 description: Local-first Kira Assist server for Home Assistant OS
 url: "https://github.com/Bosch991/kira-hassio-addon"
@@ -25,6 +25,7 @@ options:
   agent_confirmation_seconds: 120
   agent_verification_attempts: 2
   agent_verification_delay: 0.25
+  ha_registry_cache_seconds: 300
   proactive_mode: "detect"
   proactive_auto_execute: false
   kira_api_token: ""
@@ -46,6 +47,7 @@ schema:
   agent_confirmation_seconds: int
   agent_verification_attempts: int
   agent_verification_delay: float
+  ha_registry_cache_seconds: float
   proactive_mode: list(detect|suggest|execute)
   proactive_auto_execute: bool
   kira_api_token: str

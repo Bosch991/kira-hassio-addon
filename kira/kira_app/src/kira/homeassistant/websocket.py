@@ -65,6 +65,7 @@ class HomeAssistantLiveClient:
         notifications_enabled: bool = False,
         event_types: tuple[str, ...] = DEFAULT_EVENT_TYPES,
         connect_fn: Callable[..., Any] | None = None,
+        event_listeners: tuple[Callable[[HomeAssistantLiveEvent], object], ...] = (),
     ) -> None:
         """Initialize the live client."""
         self.base_url = base_url.rstrip("/") if base_url else None
@@ -77,6 +78,7 @@ class HomeAssistantLiveClient:
         self.notifications_enabled = notifications_enabled
         self.event_types = event_types
         self.connect_fn = connect_fn
+        self._event_listeners = list(event_listeners)
         self._status = HomeAssistantLiveStatus.STOPPED
         self._connected = False
         self._last_error: str | None = None
@@ -140,6 +142,15 @@ class HomeAssistantLiveClient:
         """Clear recent live events."""
         self.event_store.initialize()
         self.event_store.clear()
+
+    def add_event_listener(
+        self,
+        listener: Callable[[HomeAssistantLiveEvent], object],
+    ) -> None:
+        """Register an in-process consumer for normalized read-only events."""
+        with self._lock:
+            if listener not in self._event_listeners:
+                self._event_listeners.append(listener)
 
     async def listen_once(self) -> None:
         """Run one websocket listening loop until stopped or disconnected."""
@@ -226,6 +237,13 @@ class HomeAssistantLiveClient:
         event = self.parser.parse(payload)
         if event is None:
             return
+        with self._lock:
+            listeners = tuple(self._event_listeners)
+        for listener in listeners:
+            try:
+                listener(event)
+            except Exception:
+                LOGGER.exception("Home Assistant live event listener failed")
         if self.event_filter.should_store(event):
             self.event_store.add(event)
             LOGGER.info("Home Assistant live event: %s", event.summary)

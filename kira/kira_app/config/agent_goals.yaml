@@ -1,0 +1,129 @@
+version: 1
+
+goals:
+  watch_movie:
+    name: Film schauen
+    aliases: [film schauen, filmabend, kino, fernsehen]
+    workflow: movie
+    activity: watching_tv
+    completion_mode: all
+    completion:
+      - target: fernseher tv
+        domains: [media_player]
+        room: goal
+        states: ["on", playing, paused]
+        selection: single
+      - target: indirekt ambient led
+        domains: [light]
+        room: goal
+        states: ["on"]
+        attributes:
+          brightness_pct:
+            minimum: 15
+            maximum: 35
+            preference_key: ambient_brightness
+            tolerance: 3
+        selection: all
+        optional: true
+      - target: haupt decke
+        domains: [light]
+        room: goal
+        states: ["off"]
+        state_preference_key: main_light
+        selection: all
+        optional: true
+    preference_mappings:
+      ambient_brightness:
+        entity_tags: [indirect]
+        data_key: brightness_pct
+      main_light:
+        entity_tags: [main]
+        service_by_value:
+          "off": turn_off
+          "on": turn_on
+    completed_message: Ist schon alles fuer den Film bereit.
+
+  go_to_sleep:
+    name: Schlafengehen
+    aliases: [schlafen gehen, ins bett, gute nacht]
+    workflow: sleep
+    activity: sleeping
+    completion:
+      - target: licht
+        domains: [light]
+        states: ["off"]
+        selection: all
+        optional: true
+      - target: fernseher tv
+        domains: [media_player]
+        states: ["off", idle, standby]
+        selection: all
+        optional: true
+    completed_message: Der Nachtmodus ist bereits hergestellt.
+
+  leave_home:
+    name: Zuhause verlassen
+    aliases: [wohnung verlassen, haus verlassen, ich gehe weg]
+    workflow: leave_home
+    activity: away
+    completion:
+      - target: licht
+        domains: [light]
+        states: ["off"]
+        selection: all
+        optional: true
+
+  arrive_home:
+    name: Nach Hause kommen
+    aliases: [nach hause kommen, bin zuhause, bin wieder da]
+    workflow: arrive_home
+    activity: arriving_home
+
+  start_work:
+    name: Arbeiten beginnen
+    aliases: [arbeiten, arbeitsmodus, ich muss arbeiten]
+    workflow: work
+    activity: working
+
+  stop_work:
+    name: Arbeit beenden
+    aliases: [feierabend, arbeit beenden, fertig fuer heute]
+    workflow: work_end
+
+  cook:
+    name: Kochen
+    aliases: [kochen, ich will kochen]
+    workflow: cooking
+    activity: cooking
+
+  clean:
+    name: Reinigen
+    aliases: [putzen, saubermachen, reinigung]
+    workflow: cleaning
+    activity: cleaning
+
+  start_3d_printing:
+    name: 3D-Druck starten
+    aliases: [3d drucken, druck starten, etwas drucken]
+    workflow: printing
+    activity: printing_3d
+
+  finish_3d_printing:
+    name: 3D-Druck abschliessen
+    aliases: [druck abschliessen, 3d druck fertig]
+    activity: printing_3d
+
+  relax:
+    name: Entspannen
+    aliases: [entspannen, relaxen, ruhemodus]
+    workflow: night
+
+  secure_home:
+    name: Zuhause sichern
+    aliases: [haus sichern, wohnung sichern, alles abschliessen]
+    completion:
+      - target: schloss
+        domains: [lock]
+        states: [locked]
+        selection: all
+        optional: true

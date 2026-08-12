@@ -17,6 +17,7 @@ OPTION_ENV_MAP = {
     "agent_confirmation_seconds": "KIRA_AGENT_CONFIRMATION_SECONDS",
     "agent_verification_attempts": "KIRA_AGENT_VERIFICATION_ATTEMPTS",
     "agent_verification_delay": "KIRA_AGENT_VERIFICATION_DELAY",
+    "ha_registry_cache_seconds": "KIRA_HA_REGISTRY_CACHE_SECONDS",
     "proactive_mode": "KIRA_PROACTIVE_MODE",
     "proactive_auto_execute": "KIRA_PROACTIVE_AUTO_EXECUTE",
     "kira_api_token": "KIRA_API_TOKEN",

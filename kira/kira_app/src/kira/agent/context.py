@@ -102,6 +102,29 @@ class ConversationContextStore:
         self.save(context)
         return context
 
+    def set_pending_task(
+        self,
+        context: ConversationContext,
+        task_id: str,
+    ) -> ConversationContext:
+        """Store a conditional task awaiting explicit confirmation."""
+        context.pending_task_id = task_id
+        context.pending_task_user = context.user
+        context.pending_task_source = context.source
+        self.save(context)
+        return context
+
+    def clear_pending_task(
+        self,
+        context: ConversationContext,
+    ) -> ConversationContext:
+        """Remove a pending task confirmation from a conversation."""
+        context.pending_task_id = None
+        context.pending_task_user = None
+        context.pending_task_source = None
+        self.save(context)
+        return context
+
     def context_id(self, request: AgentRequestContext) -> str:
         """Return a stable storage key for request metadata."""
         if request.conversation_id:

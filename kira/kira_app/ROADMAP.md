@@ -1,5 +1,19 @@
 # Roadmap
 
+## 2.1.0 Kontextuelle Intelligenz
+
+- semantischer `SituationContext` statt ungefilterter Home-Assistant-States
+- Activities mit Confidence und nachvollziehbarer Evidence
+- konfigurierbare Goals, explizite Completion-Regeln und Goal-History
+- explizite Langzeit-Praeferenzen getrennt vom Conversation Context
+- Entity-, Device- und Area-Registry ueber die lesende WebSocket API
+- Registry- und konfigurationsbasierte Geraete-/Raumbeziehungen
+- begrenzte Context Fusion fuer IntentResolver und Planner
+- persistente Wenn-dann-Tasks mit Vorschauplanung und doppelter Safety-Pruefung
+- Task-Ausfuehrung erst bei passendem Live-Event; keine Sofortaktion
+- proaktive Erkennung mit Confidence/Evidence; Auto-Ausfuehrung weiter aus
+- vollstaendige Rueckwaertskompatibilitaet zur Kira-2.0-Agentenpipeline
+
 ## 2.0.0 Kontextbewusster Home-Assistant-Agent
 
 - ein gemeinsamer Agentenpfad fuer CLI, Desktop, API und Home Assistant Assist

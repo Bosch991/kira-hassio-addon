@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.1.0 - Kontextuelle Intelligenz
+
+- kompakter SituationContext fuer Praesenz, Activities, Raeume, Geraete,
+  Sicherheit, Energie und Ausfaelle
+- konfigurierbare Goals mit Completion Checks vor und nach der Ausfuehrung
+- explizite Praeferenzen und Goal-History als getrennte atomare Datenspeicher
+- Home-Assistant Entity-, Device- und Area-Registry mit Cache und Fallbacks
+- Context Fusion mit begrenzter Auswahl relevanter Entities
+- persistente bedingte Tasks mit Triggern, Conditions, Safety Classification,
+  Bestaetigung und Live-Event-Ausfuehrung
+- vorhandene Home-Assistant-Automationen werden vor eigenen Tasks bevorzugt
+- erklaerbare Proactive Signals mit Confidence und Evidence
+- Confidence-Grenzen fuer riskante Plaene und proaktive Aktionen
+- neue Akzeptanz-, Registry-, Goal-, Activity-, Task- und Proaktivtests
+- nicht-destruktive Workflow-Default-Ebene fuer bestehende Add-on-Installationen
+- Registry-Aliase, zeitlich begrenzter Goal-Kontext und strengere Activity-Evidence
+- deduplizierte Proaktivhinweise und kontrollierter Shutdown der Hintergrunddienste
+- robuste Registry-Abfragen fuer grosse Installationen und gefilterte
+  Offline-Beobachtungen ohne Helper-Entity-Logflut
+
 ## 2.0.0 - Kontextbewusster Home-Assistant-Agent
 
 - gemeinsamer Agentenpfad fuer CLI, Desktop, API und Home Assistant Assist

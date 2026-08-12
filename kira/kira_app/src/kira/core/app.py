@@ -6,14 +6,26 @@ from kira.agent.context import ConversationContextStore
 from kira.agent.coordinator import HomeAssistantAgent
 from kira.agent.entities import EntityResolver
 from kira.agent.execution import ActionExecutor, ResultValidator
+from kira.agent.fusion import ContextFusionEngine
+from kira.agent.goal_runtime import GoalRuntime
+from kira.agent.goals import (
+    GoalCompletionEvaluator,
+    GoalHistoryStore,
+    GoalPlanAdapter,
+    GoalResolver,
+)
 from kira.agent.intents import (
     IntentResolver,
     LocalIntentResolver,
     OpenAIIntentInterpreter,
 )
 from kira.agent.planning import HomeAssistantPlanner
-from kira.agent.proactive import ProactiveMode, ProactivePolicy
+from kira.agent.preferences import PreferenceStore
+from kira.agent.proactive import ProactiveEngine, ProactiveMode, ProactivePolicy
 from kira.agent.safety import HomeAssistantServiceRegistry, PlanSafetyManager
+from kira.agent.situation import SituationAnalyzer
+from kira.agent.task_runtime import TaskRunner, TaskService
+from kira.agent.tasks import TaskManager, TaskParser, TaskStatus
 from kira.agent.workflows import WorkflowEngine
 from kira.audio.devices import AudioDeviceManager
 from kira.audio.media_server import MediaServer
@@ -26,6 +38,7 @@ from kira.core.config import Settings, load_settings
 from kira.core.logging import configure_logging
 from kira.desktop.desktop import DesktopRuntime
 from kira.events.bus import EventBus
+from kira.events.events import Event
 from kira.homeassistant.action_log import HomeAssistantActionLog
 from kira.homeassistant.client import HomeAssistantClient
 from kira.homeassistant.context import HomeAssistantContextResolver
@@ -33,6 +46,10 @@ from kira.homeassistant.events import HomeAssistantEventFilter, HomeAssistantEve
 from kira.homeassistant.permissions import (
     HomeAssistantPermissionConfig,
     HomeAssistantPermissionEngine,
+)
+from kira.homeassistant.registry import (
+    HomeAssistantRegistryAdapter,
+    HomeAssistantRegistryWebSocketClient,
 )
 from kira.homeassistant.services import HomeAssistantServices
 from kira.homeassistant.status import HomeStatusService
@@ -103,15 +120,42 @@ class KiraApplication:
             event_filter=self.ha_event_filter,
             notifications_enabled=settings.kira_live_notifications,
         )
+        self.homeassistant_registry = HomeAssistantRegistryAdapter(
+            HomeAssistantRegistryWebSocketClient(
+                base_url=settings.homeassistant_url,
+                token=settings.homeassistant_token,
+            ),
+            relationship_path=settings.entity_relationships_path,
+            cache_seconds=settings.ha_registry_cache_seconds,
+        )
         self.homeassistant_world = HomeAssistantWorldModel(
             client=self.homeassistant,
             event_store=self.ha_event_store,
+            registry_adapter=self.homeassistant_registry,
         )
         self.agent_contexts = ConversationContextStore(settings.agent_context_path)
         self.agent_entity_resolver = EntityResolver()
+        self.agent_preferences = PreferenceStore(settings.agent_preferences_path)
+        self.agent_goals = GoalResolver(settings.agent_goals_path)
+        self.agent_goal_history = GoalHistoryStore(settings.agent_goal_history_path)
+        self.agent_goal_completion = GoalCompletionEvaluator(
+            self.agent_entity_resolver,
+            self.agent_goals,
+        )
+        self.agent_goal_plan_adapter = GoalPlanAdapter()
+        self.agent_goal_runtime = GoalRuntime(
+            resolver=self.agent_goals,
+            completion=self.agent_goal_completion,
+            plan_adapter=self.agent_goal_plan_adapter,
+            history=self.agent_goal_history,
+            preferences=self.agent_preferences,
+        )
+        self.agent_situation = SituationAnalyzer()
+        self.agent_context_fusion = ContextFusionEngine()
         self.agent_workflows = WorkflowEngine(
             settings.agent_workflows_path,
             entity_resolver=self.agent_entity_resolver,
+            defaults_path=settings.root_dir / "config" / "agent_workflows.yaml",
         )
         semantic_interpreter = (
             OpenAIIntentInterpreter(
@@ -143,6 +187,42 @@ class KiraApplication:
             permissions=self.ha_permissions,
             action_log=self.ha_action_log,
         )
+        self.agent_tasks = TaskManager(settings.agent_tasks_path)
+        self.agent_task_parser = TaskParser(
+            entity_resolver=self.agent_entity_resolver,
+            action_resolver=LocalIntentResolver(
+                workflow_aliases=self.agent_workflows.aliases
+            ),
+        )
+        self.agent_task_service = TaskService(
+            parser=self.agent_task_parser,
+            manager=self.agent_tasks,
+            planner=self.agent_planner,
+            safety=self.agent_safety,
+            activation_hook=self.homeassistant_live.start,
+            confirmation_seconds=settings.agent_confirmation_seconds,
+        )
+        self.agent_task_runner = TaskRunner(
+            manager=self.agent_tasks,
+            world=self.homeassistant_world,
+            contexts=self.agent_contexts,
+            planner=self.agent_planner,
+            safety=self.agent_safety,
+            executor=self.agent_executor,
+            notifier=lambda task, message: self.event_bus.publish(
+                Event(
+                    name="TaskNotification",
+                    payload={"task_id": task.id, "message": message},
+                    source="agent.tasks",
+                )
+            ),
+        )
+        self.homeassistant_live.add_event_listener(self.agent_task_runner.submit)
+        self.proactive_policy = ProactivePolicy(
+            mode=ProactiveMode(settings.proactive_mode),
+            auto_execution_enabled=settings.proactive_auto_execute,
+        )
+        self.proactive_engine = ProactiveEngine()
         self.homeassistant_agent = HomeAssistantAgent(
             world=self.homeassistant_world,
             contexts=self.agent_contexts,
@@ -152,10 +232,23 @@ class KiraApplication:
             safety=self.agent_safety,
             executor=self.agent_executor,
             confirmation_seconds=settings.agent_confirmation_seconds,
-        )
-        self.proactive_policy = ProactivePolicy(
-            mode=ProactiveMode(settings.proactive_mode),
-            auto_execution_enabled=settings.proactive_auto_execute,
+            situation_analyzer=self.agent_situation,
+            context_fusion=self.agent_context_fusion,
+            goal_runtime=self.agent_goal_runtime,
+            task_service=self.agent_task_service,
+            proactive_engine=self.proactive_engine,
+            proactive_policy=self.proactive_policy,
+            proactive_sink=lambda decision: self.event_bus.publish(
+                Event(
+                    name="ProactiveSuggestion",
+                    payload={
+                        "key": decision.signal.key,
+                        "summary": decision.signal.summary,
+                        "confidence": decision.signal.confidence,
+                    },
+                    source="agent.proactive",
+                )
+            ),
         )
         self.ha_undo = HomeAssistantUndoPlanner(
             action_log=self.ha_action_log,
@@ -211,10 +304,23 @@ class KiraApplication:
         self.ha_event_store.initialize()
         self.ha_action_log.initialize()
         self.agent_contexts.initialize()
+        self.agent_preferences.initialize()
+        self.agent_goal_history.initialize()
+        self.agent_tasks.initialize()
+        self.agent_task_runner.start()
+        if self.agent_tasks.list(statuses={TaskStatus.ACTIVE}):
+            self.homeassistant_live.start()
         self.homeassistant_world.refresh()
         self.profile_store.load()
         self.plugin_manager.load_all()
         self.telemetry.save()
+
+    def stop(self) -> None:
+        """Stop background services without changing persisted configuration."""
+        self.agent_task_runner.stop()
+        self.homeassistant_live.stop()
+        self.media_server.stop()
+        self.plugin_manager.stop_all()
 
 
 def create_app() -> KiraApplication:

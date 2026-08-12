@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0
+
+- SituationContext, Activities, Goals und Completion Checks
+- Entity-, Device- und Area-Registry mit sicheren Fallbacks
+- explizite Praeferenzen und persistente Wenn-dann-Tasks
+- erneute Planung und Safety-Pruefung bei Task-Triggern
+- erklaerbare proaktive Erkennung; automatische Ausfuehrung bleibt aus
+
 ## 2.0.0
 
 - Kontextbewusster Agent fuer Home Assistant Assist, API, Desktop und CLI

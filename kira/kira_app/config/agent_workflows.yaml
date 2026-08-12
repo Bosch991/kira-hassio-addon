@@ -1,4 +1,4 @@
-version: 1
+version: 2
 
 workflows:
   movie:
@@ -20,6 +20,13 @@ workflows:
         room: context
         selection: single
         optional: false
+      - action: turn_off
+        target: haupt decke
+        domains: [light]
+        room: context
+        selection: all
+        states: ["on"]
+        optional: true
       - action: turn_on
         target: indirekt ambient led
         domains: [light]

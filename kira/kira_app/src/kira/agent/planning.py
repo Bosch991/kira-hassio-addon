@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from kira.agent.entities import EntityCatalog, EntityResolver
@@ -14,6 +16,10 @@ from kira.agent.models import (
     SelectionMode,
 )
 from kira.agent.workflows import WorkflowEngine, action_service
+
+if TYPE_CHECKING:
+    from kira.agent.fusion import FusedContext
+    from kira.agent.goals import Goal
 
 
 class PlanningResult(BaseModel):
@@ -45,8 +51,48 @@ class HomeAssistantPlanner:
         intent: AgentIntent,
         context: ConversationContext,
         catalog: EntityCatalog,
+        *,
+        fused_context: FusedContext | None = None,
+        goal: Goal | None = None,
+        preferences: dict[str, Any] | None = None,
     ) -> PlanningResult:
-        """Create a plan or return the smallest useful clarification."""
+        """Create a situation-aware plan while preserving the original contract."""
+        result = self._plan_base(intent, context, catalog)
+        if result.plan is None or goal is None:
+            return result
+        reasons = [f"Ziel {goal.type}"]
+        if fused_context is not None and fused_context.resolved_room is not None:
+            resolved = fused_context.resolved_room
+            reasons.append(
+                f"Raum {resolved.value} aus {resolved.source} "
+                f"({resolved.confidence:.2f})"
+            )
+        if preferences:
+            reasons.append("explizite Praeferenzen vorhanden")
+        reason_suffix = "; ".join(reasons)
+        plan = result.plan.model_copy(
+            update={
+                "goal": goal.type,
+                "goal_id": goal.id,
+                "confidence": min(intent.confidence, goal.confidence),
+                "steps": [
+                    step.model_copy(
+                        update={"reason": f"{step.reason}; {reason_suffix}"}
+                    )
+                    for step in result.plan.steps
+                ],
+                "explanation": f"{result.plan.explanation} Kontext: {reason_suffix}.",
+            }
+        )
+        return result.model_copy(update={"plan": plan})
+
+    def _plan_base(
+        self,
+        intent: AgentIntent,
+        context: ConversationContext,
+        catalog: EntityCatalog,
+    ) -> PlanningResult:
+        """Run the established workflow/direct-action planning algorithm."""
         if intent.workflow:
             workflow = self.workflow_engine.plan(intent, context, catalog)
             room = intent.room or context.source_room or context.previous_room
