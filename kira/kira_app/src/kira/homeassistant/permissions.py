@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+LOGGER = logging.getLogger(__name__)
 
 
 class PermissionDecision(StrEnum):
@@ -47,37 +50,46 @@ class HomeAssistantPermissionConfig:
         """Load permissions from YAML, using empty defaults when missing."""
         if not path.exists():
             return cls.default()
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError) as exc:
+            LOGGER.warning("Home Assistant permissions could not be loaded: %s", exc)
+            return cls.default()
         if not isinstance(data, dict):
-            return cls()
+            return cls.default()
         confirm_rules = data.get("confirm_rules", {})
         if not isinstance(confirm_rules, dict):
             confirm_rules = {}
         risk_levels = data.get("risk_levels", {})
         if not isinstance(risk_levels, dict):
             risk_levels = {}
-        return cls(
-            allowed_domains=_string_set(data.get("allowed_domains")),
-            allowed_rooms=_string_set(data.get("allowed_rooms")),
-            allowed_entities=_string_set(data.get("allowed_entities")),
-            blocked_entities=_string_set(data.get("blocked_entities")),
-            low_risk_auto_execute=_string_set(data.get("low_risk_auto_execute")),
-            require_confirm=_string_set(data.get("require_confirm")),
-            always_block=_string_set(data.get("always_block")),
-            risk_levels={
-                str(level): _string_set(domains)
-                for level, domains in risk_levels.items()
-            },
-            require_confirm_for_multiple_rooms=bool(
-                confirm_rules.get("require_confirm_for_multiple_rooms", True)
-            ),
-            require_confirm_for_risky_domains=bool(
-                confirm_rules.get("require_confirm_for_risky_domains", True)
-            ),
-            require_confirm_over_entity_count=int(
-                confirm_rules.get("require_confirm_over_entity_count", 5)
-            ),
-        )
+        try:
+            return cls(
+                allowed_domains=_string_set(data.get("allowed_domains")),
+                allowed_rooms=_string_set(data.get("allowed_rooms")),
+                allowed_entities=_string_set(data.get("allowed_entities")),
+                blocked_entities=_string_set(data.get("blocked_entities")),
+                low_risk_auto_execute=_string_set(data.get("low_risk_auto_execute")),
+                require_confirm=_string_set(data.get("require_confirm")),
+                always_block=_string_set(data.get("always_block")),
+                risk_levels={
+                    str(level): _string_set(domains)
+                    for level, domains in risk_levels.items()
+                },
+                require_confirm_for_multiple_rooms=bool(
+                    confirm_rules.get("require_confirm_for_multiple_rooms", True)
+                ),
+                require_confirm_for_risky_domains=bool(
+                    confirm_rules.get("require_confirm_for_risky_domains", True)
+                ),
+                require_confirm_over_entity_count=max(
+                    0,
+                    int(confirm_rules.get("require_confirm_over_entity_count", 5)),
+                ),
+            )
+        except (TypeError, ValueError) as exc:
+            LOGGER.warning("Home Assistant permissions are invalid: %s", exc)
+            return cls.default()
 
     @classmethod
     def default(cls) -> HomeAssistantPermissionConfig:
@@ -100,6 +112,10 @@ class HomeAssistantPermissionConfig:
                 "media_player.volume_set",
                 "media_player.volume_up",
                 "media_player.volume_down",
+                "media_player.turn_on",
+                "media_player.turn_off",
+                "media_player.media_play",
+                "media_player.media_pause",
                 "media_player.media_stop",
                 "fan.turn_on",
                 "fan.turn_off",
@@ -188,6 +204,18 @@ class HomeAssistantPermissionEngine:
                     risk_level,
                     "entity_not_explicitly_allowed",
                 )
+        if self.config.allowed_rooms and area_ids:
+            unknown_rooms = [
+                area_id
+                for area_id in area_ids
+                if not _room_is_allowed(area_id, self.config.allowed_rooms)
+            ]
+            if unknown_rooms:
+                return self._result(
+                    PermissionDecision.REQUIRE_CONFIRM,
+                    risk_level,
+                    "room_not_explicitly_allowed",
+                )
         if action in self.config.require_confirm:
             return self._result(
                 PermissionDecision.REQUIRE_CONFIRM,
@@ -256,3 +284,26 @@ def _string_set(value: Any) -> set[str]:
     if not isinstance(value, list):
         return set()
     return {str(item) for item in value if item is not None}
+
+
+def _room_is_allowed(room: str, allowed_rooms: set[str]) -> bool:
+    normalized = _normalize_identifier(room)
+    return any(
+        normalized == allowed or normalized in allowed or allowed in normalized
+        for item in allowed_rooms
+        if (allowed := _normalize_identifier(item))
+    )
+
+
+def _normalize_identifier(value: str) -> str:
+    normalized = value.lower().translate(
+        str.maketrans(
+            {
+                "\u00e4": "ae",
+                "\u00f6": "oe",
+                "\u00fc": "ue",
+                "\u00df": "ss",
+            }
+        )
+    )
+    return "_".join(part for part in normalized.replace("-", " ").split() if part)

@@ -312,8 +312,7 @@ class KiraMainWindow(QMainWindow):
 
     def _apply_theme(self) -> None:
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet(
-            """
+        self.setStyleSheet("""
             QMainWindow, QWidget {
                 background: #0d1117;
                 color: #d9e7ef;
@@ -379,5 +378,4 @@ class KiraMainWindow(QMainWindow):
             QGroupBox[level="error"] {
                 border-color: #a83f3f;
             }
-            """
-        )
+            """)

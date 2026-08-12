@@ -2,6 +2,19 @@
 
 from __future__ import annotations
 
+from kira.agent.context import ConversationContextStore
+from kira.agent.coordinator import HomeAssistantAgent
+from kira.agent.entities import EntityResolver
+from kira.agent.execution import ActionExecutor, ResultValidator
+from kira.agent.intents import (
+    IntentResolver,
+    LocalIntentResolver,
+    OpenAIIntentInterpreter,
+)
+from kira.agent.planning import HomeAssistantPlanner
+from kira.agent.proactive import ProactiveMode, ProactivePolicy
+from kira.agent.safety import HomeAssistantServiceRegistry, PlanSafetyManager
+from kira.agent.workflows import WorkflowEngine
 from kira.audio.devices import AudioDeviceManager
 from kira.audio.media_server import MediaServer
 from kira.audio.player import AudioPlayer
@@ -94,6 +107,56 @@ class KiraApplication:
             client=self.homeassistant,
             event_store=self.ha_event_store,
         )
+        self.agent_contexts = ConversationContextStore(settings.agent_context_path)
+        self.agent_entity_resolver = EntityResolver()
+        self.agent_workflows = WorkflowEngine(
+            settings.agent_workflows_path,
+            entity_resolver=self.agent_entity_resolver,
+        )
+        semantic_interpreter = (
+            OpenAIIntentInterpreter(
+                api_key=settings.openai_api_key,
+                model=settings.openai_model,
+            )
+            if settings.agent_semantic_enabled
+            else None
+        )
+        self.agent_intents = IntentResolver(
+            semantic=semantic_interpreter,
+            local=LocalIntentResolver(workflow_aliases=self.agent_workflows.aliases),
+        )
+        self.agent_planner = HomeAssistantPlanner(
+            entity_resolver=self.agent_entity_resolver,
+            workflow_engine=self.agent_workflows,
+        )
+        self.agent_safety = PlanSafetyManager(
+            permissions=self.ha_permissions,
+            service_registry=HomeAssistantServiceRegistry(self.homeassistant_services),
+        )
+        self.agent_executor = ActionExecutor(
+            services=self.homeassistant_services,
+            validator=ResultValidator(
+                self.homeassistant,
+                attempts=settings.agent_verification_attempts,
+                delay_seconds=settings.agent_verification_delay,
+            ),
+            permissions=self.ha_permissions,
+            action_log=self.ha_action_log,
+        )
+        self.homeassistant_agent = HomeAssistantAgent(
+            world=self.homeassistant_world,
+            contexts=self.agent_contexts,
+            intents=self.agent_intents,
+            entity_resolver=self.agent_entity_resolver,
+            planner=self.agent_planner,
+            safety=self.agent_safety,
+            executor=self.agent_executor,
+            confirmation_seconds=settings.agent_confirmation_seconds,
+        )
+        self.proactive_policy = ProactivePolicy(
+            mode=ProactiveMode(settings.proactive_mode),
+            auto_execution_enabled=settings.proactive_auto_execute,
+        )
         self.ha_undo = HomeAssistantUndoPlanner(
             action_log=self.ha_action_log,
             services=self.homeassistant_services,
@@ -147,6 +210,7 @@ class KiraApplication:
         self.openart_history.initialize()
         self.ha_event_store.initialize()
         self.ha_action_log.initialize()
+        self.agent_contexts.initialize()
         self.homeassistant_world.refresh()
         self.profile_store.load()
         self.plugin_manager.load_all()

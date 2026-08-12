@@ -1,0 +1,156 @@
+version: 1
+
+workflows:
+  movie:
+    name: Filmabend
+    aliases:
+      - film schauen
+      - filmabend
+      - kino
+      - fernsehen
+    preferred_ha_terms:
+      - film
+      - kino
+      - movie
+      - tv
+    fallback_steps:
+      - action: turn_on
+        target: fernseher tv
+        domains: [media_player]
+        room: context
+        selection: single
+        optional: false
+      - action: turn_on
+        target: indirekt ambient led
+        domains: [light]
+        room: context
+        selection: all
+        data:
+          brightness_pct: 30
+        optional: true
+
+  sleep:
+    name: Schlafengehen
+    aliases:
+      - schlafen gehen
+      - ins bett
+      - ich gehe schlafen
+      - gute nacht
+    preferred_ha_terms:
+      - schlafen
+      - gute nacht
+      - night
+      - bedtime
+    fallback_steps:
+      - action: turn_off
+        target: licht
+        domains: [light]
+        selection: all
+        states: ["on"]
+        optional: true
+      - action: turn_off
+        target: fernseher tv
+        domains: [media_player]
+        selection: all
+        states: ["on", playing, paused]
+        optional: true
+
+  leave_home:
+    name: Zuhause verlassen
+    aliases:
+      - wohnung verlassen
+      - haus verlassen
+      - ich gehe weg
+    preferred_ha_terms:
+      - verlassen
+      - away
+      - abwesend
+    fallback_steps:
+      - action: turn_off
+        target: licht
+        domains: [light]
+        selection: all
+        states: ["on"]
+        optional: true
+      - action: turn_off
+        target: fernseher tv
+        domains: [media_player]
+        selection: all
+        states: ["on", playing, paused]
+        optional: true
+
+  arrive_home:
+    name: Nach Hause kommen
+    aliases:
+      - nach hause kommen
+      - bin zuhause
+      - bin wieder da
+    preferred_ha_terms: [ankommen, zuhause, home, welcome]
+    fallback_steps: []
+
+  cooking:
+    name: Kochen
+    aliases: [kochen, ich will kochen]
+    preferred_ha_terms: [kochen, cooking, kueche]
+    fallback_steps:
+      - action: turn_on
+        target: haupt arbeitsplatte
+        domains: [light]
+        room: kueche
+        selection: all
+        optional: false
+
+  work:
+    name: Arbeiten
+    aliases: [arbeiten, arbeitsmodus, ich muss arbeiten]
+    preferred_ha_terms: [arbeiten, arbeit, work, office]
+    fallback_steps:
+      - action: turn_on
+        target: arbeit haupt
+        domains: [light]
+        room: arbeit
+        selection: all
+        optional: true
+
+  work_end:
+    name: Feierabend
+    aliases: [fertig fuer heute, feierabend, arbeit beenden]
+    preferred_ha_terms: [feierabend, arbeit aus, work off]
+    fallback_steps:
+      - action: turn_off
+        target: arbeit
+        domains: [light, switch]
+        room: arbeit
+        selection: all
+        states: ["on"]
+        optional: true
+
+  printing:
+    name: 3D-Drucken
+    aliases: [3d drucken, druck starten, etwas drucken]
+    preferred_ha_terms: [3d druck, drucker, print]
+    fallback_steps: []
+
+  cleaning:
+    name: Putzen
+    aliases: [putzen, saubermachen, reinigung]
+    preferred_ha_terms: [putzen, reinigen, cleaning, vacuum]
+    fallback_steps: []
+
+  night:
+    name: Nachtmodus
+    aliases: [nachtmodus, abendmodus]
+    preferred_ha_terms: [nacht, night, abend]
+    fallback_steps: []
+
+  guests:
+    name: Besuch
+    aliases: [besuch kommt, gaestemodus, wir bekommen besuch]
+    preferred_ha_terms: [besuch, gast, guest]
+    fallback_steps: []
+
+  away:
+    name: Abwesenheit
+    aliases: [abwesenheit, urlaubsmodus]
+    preferred_ha_terms: [abwesenheit, urlaub, away, vacation]
+    fallback_steps: []

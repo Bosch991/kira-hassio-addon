@@ -21,6 +21,10 @@ low_risk_auto_execute:
   - media_player.volume_set
   - media_player.volume_up
   - media_player.volume_down
+  - media_player.turn_on
+  - media_player.turn_off
+  - media_player.media_play
+  - media_player.media_pause
   - media_player.media_stop
   - fan.turn_on
   - fan.turn_off

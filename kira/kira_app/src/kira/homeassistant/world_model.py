@@ -39,14 +39,20 @@ class HomeAssistantWorldModel:
         self.event_store = event_store
         self.analyzer = HomeAssistantAnalyzer()
         self.snapshot: HomeAssistantWorldSnapshot | None = None
+        self.last_refresh_ok = False
+        self.last_refresh_error: str | None = None
 
     def refresh(self) -> HomeAssistantWorldSnapshot | None:
         """Refresh the world model from Home Assistant states."""
         result = self.client.states()
         if not result.ok or not isinstance(result.data, list):
+            self.last_refresh_ok = False
+            self.last_refresh_error = result.error or "Unerwartete States-Antwort."
             return self.snapshot
         states = [item for item in result.data if isinstance(item, dict)]
         self.snapshot = self.from_states(states)
+        self.last_refresh_ok = True
+        self.last_refresh_error = None
         return self.snapshot
 
     def from_states(self, states: list[dict[str, Any]]) -> HomeAssistantWorldSnapshot:

@@ -1,5 +1,22 @@
 # Roadmap
 
+## 2.0.0 Kontextbewusster Home-Assistant-Agent
+
+- ein gemeinsamer Agentenpfad fuer CLI, Desktop, API und Home Assistant Assist
+- persistenter Conversation-, Benutzer-, Quellen- und Raumkontext
+- strukturierte semantische Intent-Erkennung mit lokalem Fallback
+- dynamische Entity-Aufloesung aus Live-States, Faehigkeiten und Beziehungen
+- Referenzen und Folgefragen wie `es`, `hier`, `das andere` und `dunkler`
+- datengetriebene Ablaufe fuer Fernsehen, Schlafen, Verlassen und Arbeiten
+- vorhandene Scenes, Scripts und Automationen vor dynamischen Plaenen
+- planweite Sicherheitspruefung gegen Entities und echten Service-Katalog
+- No-op-Erkennung, frische Vorab-States und Ergebnisverifikation
+- ablaufende, Conversation-gebundene Bestaetigungen fuer sensible Plaene
+- getrennte Proaktiv-Modi `detect`, `suggest` und `execute`; Auto-Ausfuehrung aus
+  Sicherheitsgruenden standardmaessig deaktiviert
+- Architektur- und Sicherheitsdokumentation mit umfangreichen Regressionstests
+- GitHub-CI fuer Python-Qualitaet, Paketgleichheit und Add-on-Docker-Build
+
 ## 1.9.0 Desktop Companion
 
 - kleiner Floating Assistant als Always-on-top-Fenster
@@ -13,7 +30,7 @@
 
 - Add-on-Preflight fuer Tokens und persistente Schreibrechte
 - Docker-Healthcheck gegen Kira `/health`
-- Home-Assistant-Add-on-Watchdog und Web-UI-Link
+- Docker-nativer Healthcheck fuer den Home-Assistant-Watchdog und Web-UI-Link
 - Diagnose-Endpunkt `GET /addon/status` ohne Secrets
 - robuster Add-on-Optionsparser ohne Python-Traceback bei defektem JSON
 - volle explizite Home-Assistant-Kontrolle ueber `/ha services` und `/ha call`

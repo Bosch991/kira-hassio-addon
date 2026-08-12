@@ -1,10 +1,11 @@
 # Kira
 
-Kira `1.9.1` ist eine lokale, modulare Assistenten-Plattform. Die bisherigen
-Funktionen bleiben erhalten: Terminal-Chat, OpenAI-Fallback, Home Assistant,
-Voice, Audio-Routing, Memory, Knowledge und Live-Events. Neu ist die
-Plattformschicht: Plugins, Event-Bus, Scheduler-Infrastruktur, API,
-Benutzerprofil, Desktop-Vorbereitung, lokale Telemetrie und Backup/Import.
+Kira `2.0.0` ist eine lokale, modulare Assistenten-Plattform. Terminal-Chat,
+Desktop-App, OpenAI-Fallback, Home Assistant, Voice, Audio-Routing, Memory,
+Knowledge, Live-Events, Plugins, API und Backup bleiben erhalten. Neu ist ein
+kontextbewusster Home-Assistant-Agent: Er versteht freie Absichten, loest
+Ziele gegen den aktuellen Hauszustand auf, plant mehrere Schritte, prueft
+Sicherheit und Faehigkeiten und bestaetigt Ergebnisse durch erneutes Lesen.
 Version `1.1.0` ergaenzt OpenArt-Bildgenerierung mit deinem bestehenden
 Kira-Modell, Kira-Style und Kira-World.
 Version `1.2.0` bereitet Kira als externen Home-Assistant-Assist-Agent vor
@@ -29,7 +30,7 @@ Version `1.9.1` ergaenzt einen kleinen Floating Desktop Companion mit
 Always-on-top-Fenster, Sprechblase, Kira-Avatar, Kontextmenue und
 Schnellaktionen.
 Der aktuelle Hassio-Stabilitaetsausbau ergaenzt Add-on-Preflight,
-Container-Healthcheck, Home-Assistant-Watchdog und den Diagnose-Endpunkt
+Docker-nativen Healthcheck, Supervisor-Watchdog und den Diagnose-Endpunkt
 `GET /addon/status`.
 
 ## Installation
@@ -59,7 +60,7 @@ Kira kann komplett als Add-on auf Home Assistant OS laufen. Auf dem
 Entwicklungsrechner wird das Add-on paketiert:
 
 ```powershell
-.\scripts\package-hassio-addon.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-hassio-addon.ps1
 ```
 
 Danach den Ordner `homeassistant_addons/kira/` nach `/addons/kira/` auf Home
@@ -96,6 +97,12 @@ KIRA_MEDIA_SERVER_HOST=0.0.0.0
 KIRA_MEDIA_SERVER_PORT=8765
 KIRA_MEDIA_BASE_URL=http://<NUC-IP>:8765
 KIRA_LIVE_NOTIFICATIONS=false
+KIRA_AGENT_SEMANTIC_ENABLED=true
+KIRA_AGENT_CONFIRMATION_SECONDS=120
+KIRA_AGENT_VERIFICATION_ATTEMPTS=2
+KIRA_AGENT_VERIFICATION_DELAY=0.25
+KIRA_PROACTIVE_MODE=detect
+KIRA_PROACTIVE_AUTO_EXECUTE=false
 KIRA_API_HOST=0.0.0.0
 KIRA_API_PORT=8787
 KIRA_API_TOKEN=
@@ -113,6 +120,50 @@ LOG_LEVEL=INFO
 Plugin-Konfiguration liegt unter `config/plugins/<plugin>.yaml`.
 Home-Assistant-Aktionsrechte liegen unter `config/ha_permissions.yaml`.
 Das lokale Aktionsprotokoll liegt unter `data/homeassistant/action_log.json`.
+Agenten-Workflows liegen unter `config/agent_workflows.yaml`. Strukturierter
+Gespraechskontext wird pro Conversation unter
+`data/homeassistant/conversation_contexts.json` gespeichert.
+
+## Intelligenter Home-Assistant-Agent
+
+Alle natuerlichen Anfragen aus CLI, Desktop, `POST /chat` und Home Assistant
+Assist laufen ueber denselben Agentenpfad:
+
+```text
+Anfrage + Benutzer-/Raumkontext
+-> IntentResolver
+-> EntityResolver mit aktuellen HA-States
+-> WorkflowEngine und Planner
+-> planweite Sicherheitspruefung
+-> Ausfuehrung
+-> erneutes Lesen der Zielentities
+-> kurze, belegte Antwort
+```
+
+Beispiele:
+
+```text
+Wie warm ist es draussen?
+Mach das Licht im Wohnzimmer an.
+Etwas dunkler.
+Und mach es waermer.
+Ich will einen Film schauen.
+Ich gehe schlafen.
+```
+
+Kira bevorzugt passende vorhandene Home-Assistant-Scenes, Scripts und
+Automationen. Nur wenn nichts passt, erzeugt sie einen konservativen Plan aus
+tatsaechlich vorhandenen und verfuegbaren Entities. Bereits erreichte
+Zustaende werden nicht erneut geschaltet. Kritische oder breite Plaene werden
+als ablaufende Bestaetigung an die aktuelle Conversation gebunden.
+
+Das Sprachmodell liefert nur eine strukturierte, abstrakte Absicht. Entity-IDs,
+Services, Faehigkeiten und Parameter werden lokal gegen Home Assistant
+validiert. Bei fehlendem OpenAI-Key oder Modellfehler arbeitet ein lokaler
+Resolver fuer Basisaktionen und Zustandsfragen weiter. Proaktive automatische
+Aktionen bleiben standardmaessig deaktiviert.
+
+Details: `docs/intelligent_agent.md` und `docs/action_safety.md`.
 
 ## Plugins
 
@@ -293,10 +344,17 @@ Vorbereitete Endpunkte:
 - `GET /health`
 - `GET /version`
 - `GET /plugins`
+- `GET /addon/status`
+- `GET /updates/status`
+- `GET /updates/check`
 - `POST /chat`
 - `POST /assist`
+- `POST /updates/pull`
+- `POST /updates/restart`
 
-POST-Endpunkte benoetigen `Authorization: Bearer <KIRA_API_TOKEN>`.
+Alle POST-Endpunkte benoetigen
+`Authorization: Bearer <KIRA_API_TOKEN>`. Status- und Diagnoseantworten
+enthalten keine Tokens.
 
 ## Projektstruktur
 
@@ -312,6 +370,7 @@ Kira/
 |-- config/
 |   `-- plugins/
 |-- src/kira/
+|   |-- agent/
 |   |-- api/
 |   |-- audio/
 |   |-- backup/
@@ -341,7 +400,12 @@ Kira/
 python -m pytest
 python -m ruff check .
 python -m black --check .
+python -m pip_audit -r requirements.txt --progress-spinner off
 ```
+
+GitHub Actions wiederholt diese Pruefungen bei jedem Push und kontrolliert
+zusaetzlich die Paketgleichheit. Das Add-on-Repository validiert seine
+Home-Assistant-Metadaten und baut ein Test-Containerimage.
 
 Weitere Details:
 
@@ -350,6 +414,8 @@ Weitere Details:
 - `docs/events.md`
 - `docs/api.md`
 - `docs/homeassistant_assist.md`
+- `docs/intelligent_agent.md`
+- `docs/action_safety.md`
 - `docs/hassio_addon.md`
 - `docs/alexa_media.md`
 - `docs/openart.md`

@@ -1,18 +1,15 @@
 name: Kira
-version: "1.9.1"
+version: "2.0.0"
 slug: kira
 description: Local-first Kira Assist server for Home Assistant OS
 url: "https://github.com/Bosch991/kira-hassio-addon"
 arch:
   - aarch64
   - amd64
-  - armv7
 startup: services
-boot: auto
 init: false
 homeassistant_api: true
 webui: "http://[HOST]:[PORT:8787]"
-watchdog: "http://[HOST]:[PORT:8787]/health"
 map:
   - addon_config:rw
 ports:
@@ -24,6 +21,12 @@ ports_description:
 options:
   openai_api_key: ""
   openai_model: "gpt-4.1-mini"
+  agent_semantic_enabled: true
+  agent_confirmation_seconds: 120
+  agent_verification_attempts: 2
+  agent_verification_delay: 0.25
+  proactive_mode: "detect"
+  proactive_auto_execute: false
   kira_api_token: ""
   elevenlabs_api_key: ""
   elevenlabs_voice_id: ""
@@ -39,6 +42,12 @@ options:
 schema:
   openai_api_key: str
   openai_model: str
+  agent_semantic_enabled: bool
+  agent_confirmation_seconds: int
+  agent_verification_attempts: int
+  agent_verification_delay: float
+  proactive_mode: list(detect|suggest|execute)
+  proactive_auto_execute: bool
   kira_api_token: str
   elevenlabs_api_key: str
   elevenlabs_voice_id: str

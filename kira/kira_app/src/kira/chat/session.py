@@ -13,6 +13,8 @@ from typing import Any, TextIO
 
 from rich.console import Console
 
+from kira.agent.coordinator import HomeAssistantAgent
+from kira.agent.models import AgentRequestContext
 from kira.audio.devices import AudioDevice, AudioDeviceManager
 from kira.audio.media_server import MediaServer
 from kira.audio.recorder import AudioRecorder, RecordingResult, RecordingStatus
@@ -94,6 +96,7 @@ class ChatSession:
         ha_action_log: HomeAssistantActionLog | None = None,
         ha_undo: HomeAssistantUndoPlanner | None = None,
         homeassistant_world: HomeAssistantWorldModel | None = None,
+        homeassistant_agent: HomeAssistantAgent | None = None,
         openart: OpenArtClient | None = None,
         openart_prompt_builder: OpenArtPromptBuilder | None = None,
         openart_history: OpenArtHistoryStore | None = None,
@@ -132,6 +135,7 @@ class ChatSession:
         self.homeassistant_world = homeassistant_world or HomeAssistantWorldModel(
             client=homeassistant
         )
+        self.homeassistant_agent = homeassistant_agent
         self.homeassistant_live = homeassistant_live
         self.voice = voice
         self.audio_recorder = audio_recorder
@@ -177,6 +181,7 @@ class ChatSession:
             ha_action_log=getattr(app, "ha_action_log", None),
             ha_undo=getattr(app, "ha_undo", None),
             homeassistant_world=getattr(app, "homeassistant_world", None),
+            homeassistant_agent=getattr(app, "homeassistant_agent", None),
             homeassistant_live=app.homeassistant_live,
             voice=app.voice,
             audio_recorder=app.audio_recorder,
@@ -423,7 +428,11 @@ class ChatSession:
             self.event_bus.publish(ChatMessageReceived(message))
         started = time.perf_counter()
         self.conversation.append(role="user", content=message)
-        response = self._assist_response(message, self._assist_origin(context))
+        response = self._assist_response(
+            message,
+            self._assist_origin(context),
+            self._agent_request_context(context),
+        )
         self.conversation.append(role="assistant", content=response)
         if self.telemetry is not None:
             self.telemetry.record_response_time(
@@ -448,6 +457,30 @@ class ChatSession:
 
     def _optional_context_string(self, value: object) -> str | None:
         return value if isinstance(value, str) and value else None
+
+    def _agent_request_context(
+        self,
+        context: dict[str, Any] | None,
+    ) -> AgentRequestContext:
+        values = context or {}
+        metadata = values.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        source_room = self._optional_context_string(metadata.get("area_name"))
+        if source_room is None:
+            source_room = self._optional_context_string(values.get("area_id"))
+        source_device = self._optional_context_string(values.get("device_id"))
+        if source_device is None:
+            source_device = self._optional_context_string(metadata.get("source_device"))
+        return AgentRequestContext(
+            conversation_id=self._optional_context_string(
+                values.get("conversation_id")
+            ),
+            user=self._optional_context_string(values.get("user")),
+            source=self._optional_context_string(values.get("source"))
+            or "homeassistant",
+            source_device=source_device,
+            source_room=source_room,
+        )
 
     def _show_about(self) -> None:
         self._respond(
@@ -532,6 +565,8 @@ class ChatSession:
         """Reload personality prompt and knowledge files from disk."""
         self.system_prompt = load_system_prompt(self.settings)
         self.knowledge.reload()
+        if self.homeassistant_agent is not None:
+            self.homeassistant_agent.planner.workflow_engine.reload()
 
     def _handle_homeassistant(self, command_text: str) -> None:
         parts = command_text.split()
@@ -1464,6 +1499,18 @@ class ChatSession:
         if self._asks_for_home_status(message):
             return self.home_status.status().response
 
+        if self.homeassistant_agent is not None:
+            agent_result = self.homeassistant_agent.handle(
+                message,
+                AgentRequestContext(
+                    conversation_id="local-chat",
+                    user="local-user",
+                    source="chat",
+                ),
+            )
+            if agent_result.handled:
+                return agent_result.response
+
         safety_answer = self._answer_homeassistant_safety(message)
         if safety_answer is not None:
             return safety_answer
@@ -1491,7 +1538,12 @@ class ChatSession:
 
         return self._fallback_response(message=message, result=result)
 
-    def _assist_response(self, message: str, origin: AssistOrigin | None) -> str:
+    def _assist_response(
+        self,
+        message: str,
+        origin: AssistOrigin | None,
+        agent_context: AgentRequestContext,
+    ) -> str:
         update_answer = self._answer_update_request(message)
         if update_answer is not None:
             return update_answer
@@ -1502,6 +1554,11 @@ class ChatSession:
 
         if self._asks_for_home_status(message):
             return self.home_status.status().response
+
+        if self.homeassistant_agent is not None:
+            agent_result = self.homeassistant_agent.handle(message, agent_context)
+            if agent_result.handled:
+                return agent_result.response
 
         if self._asks_for_unclear_whole_house_action(message):
             return "Da bin ich mir nicht sicher. Welchen Bereich meinst du?"

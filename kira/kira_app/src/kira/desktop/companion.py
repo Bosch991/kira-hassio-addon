@@ -389,8 +389,7 @@ class CompanionWindow(QWidget):
         return f"{text[:117]}..."
 
     def _apply_theme(self) -> None:
-        self.setStyleSheet(
-            """
+        self.setStyleSheet("""
             QLabel#companionAvatar {
                 background: rgba(12, 25, 34, 220);
                 border: 2px solid #6ee7ff;
@@ -429,5 +428,4 @@ class CompanionWindow(QWidget):
             QPushButton#companionButton:hover {
                 background: rgba(7, 80, 106, 240);
             }
-            """
-        )
+            """)

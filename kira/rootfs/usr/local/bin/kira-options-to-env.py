@@ -13,6 +13,12 @@ OPTIONS_PATH = Path("/data/options.json")
 OPTION_ENV_MAP = {
     "openai_api_key": "OPENAI_API_KEY",
     "openai_model": "OPENAI_MODEL",
+    "agent_semantic_enabled": "KIRA_AGENT_SEMANTIC_ENABLED",
+    "agent_confirmation_seconds": "KIRA_AGENT_CONFIRMATION_SECONDS",
+    "agent_verification_attempts": "KIRA_AGENT_VERIFICATION_ATTEMPTS",
+    "agent_verification_delay": "KIRA_AGENT_VERIFICATION_DELAY",
+    "proactive_mode": "KIRA_PROACTIVE_MODE",
+    "proactive_auto_execute": "KIRA_PROACTIVE_AUTO_EXECUTE",
     "kira_api_token": "KIRA_API_TOKEN",
     "elevenlabs_api_key": "ELEVENLABS_API_KEY",
     "elevenlabs_voice_id": "ELEVENLABS_VOICE_ID",

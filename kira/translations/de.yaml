@@ -1,10 +1,28 @@
 configuration:
   openai_api_key:
     name: OpenAI API Key
-    description: API-Key fuer freie Kira-Gesprae und Assist-Antworten.
+    description: API-Key fuer freie Kira-Gespraeche und Assist-Antworten.
   openai_model:
     name: OpenAI Modell
     description: Modellname, den Kira fuer Antworten nutzt.
+  agent_semantic_enabled:
+    name: Semantischer Kira Agent
+    description: Nutzt OpenAI fuer strukturierte Absichtserkennung mit lokalem Fallback.
+  agent_confirmation_seconds:
+    name: Bestaetigungszeit
+    description: Sekunden, nach denen ein ausstehender sicherheitsrelevanter Plan ablaeuft.
+  agent_verification_attempts:
+    name: Pruefversuche
+    description: Anzahl begrenzter State-Pruefungen nach einer Aktion.
+  agent_verification_delay:
+    name: Pruefintervall
+    description: Wartezeit in Sekunden zwischen State-Pruefungen.
+  proactive_mode:
+    name: Proaktiver Modus
+    description: Erkennen, vorschlagen oder vorbereiteter Ausfuehrungsmodus.
+  proactive_auto_execute:
+    name: Proaktive Ausfuehrung
+    description: Bleibt ohne zusaetzliche Allowlist wirkungslos und ist standardmaessig aus.
   kira_api_token:
     name: Kira API Token
     description: Bearer Token fuer Home Assistant Assist POST /assist.

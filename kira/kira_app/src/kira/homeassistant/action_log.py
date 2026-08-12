@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import RLock
 from typing import Any
 from uuid import uuid4
 
@@ -34,12 +36,13 @@ class HomeAssistantActionLog:
     def __init__(self, path: Path) -> None:
         """Initialize the log path."""
         self.path = path
+        self._lock = RLock()
+        self.logger = logging.getLogger(__name__)
 
     def initialize(self) -> None:
         """Create the log file when needed."""
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.path.exists():
-            self.path.write_text("[]\n", encoding="utf-8")
+        with self._lock:
+            self._initialize_unlocked()
 
     def append(
         self,
@@ -56,48 +59,89 @@ class HomeAssistantActionLog:
         new_states: dict[str, str] | None = None,
     ) -> HomeAssistantActionRecord:
         """Append one action record."""
-        self.initialize()
-        record = HomeAssistantActionRecord(
-            id=str(uuid4()),
-            timestamp=datetime.now(UTC).isoformat(),
-            user_text=user_text,
-            intent=intent,
-            entities=entities,
-            service_call=service_call,
-            risk_level=risk_level,
-            auto_executed=auto_executed,
-            result=result,
-            error=error,
-            previous_states=previous_states or {},
-            new_states=new_states or {},
-        )
-        records = self._read()
-        records.append(_record_to_dict(record))
-        self.path.write_text(
-            json.dumps(records[-200:], ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        return record
+        with self._lock:
+            self._initialize_unlocked()
+            record = HomeAssistantActionRecord(
+                id=str(uuid4()),
+                timestamp=datetime.now(UTC).isoformat(),
+                user_text=user_text,
+                intent=intent,
+                entities=entities,
+                service_call=service_call,
+                risk_level=risk_level,
+                auto_executed=auto_executed,
+                result=result,
+                error=error,
+                previous_states=previous_states or {},
+                new_states=new_states or {},
+            )
+            records = self._read_unlocked()
+            records.append(_record_to_dict(record))
+            self._write_unlocked(records[-200:])
+            return record
 
     def last_undoable(self) -> HomeAssistantActionRecord | None:
         """Return the last simple executed action with previous state data."""
-        for item in reversed(self._read()):
-            record = _record_from_dict(item)
-            if (
-                record.auto_executed
-                and record.result == "success"
-                and record.previous_states
-                and record.service_call.get("domain") in {"light", "switch", "fan"}
-            ):
-                return record
+        with self._lock:
+            self._initialize_unlocked()
+            for item in reversed(self._read_unlocked()):
+                record = _record_from_dict(item)
+                if not record.auto_executed:
+                    continue
+                if record.result not in {"success", "verified"}:
+                    return None
+                if not record.previous_states:
+                    return None
+                if record.service_call.get("domain") not in {
+                    "light",
+                    "switch",
+                    "fan",
+                }:
+                    return None
+                return record if _is_simple_state_change(record.service_call) else None
         return None
 
     def _read(self) -> list[dict[str, Any]]:
-        self.initialize()
-        data = json.loads(self.path.read_text(encoding="utf-8"))
+        with self._lock:
+            self._initialize_unlocked()
+            return self._read_unlocked()
+
+    def _initialize_unlocked(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.path.exists():
+            self._write_unlocked([])
+
+    def _read_unlocked(self) -> list[dict[str, Any]]:
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            self.logger.warning(
+                "Home Assistant action log could not be loaded: %s", exc
+            )
+            backup = self.path.with_name(
+                f"{self.path.name}.corrupt-"
+                f"{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
+            )
+            try:
+                self.path.replace(backup)
+                self._write_unlocked([])
+            except OSError as backup_error:
+                self.logger.error(
+                    "Action log recovery could not preserve the bad file: %s",
+                    backup_error,
+                )
+            return []
         if not isinstance(data, list):
             return []
         return [item for item in data if isinstance(item, dict)]
+
+    def _write_unlocked(self, records: list[dict[str, Any]]) -> None:
+        temporary = self.path.with_suffix(f"{self.path.suffix}.tmp")
+        temporary.write_text(
+            json.dumps(records, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(self.path)
 
 
 def _record_to_dict(record: HomeAssistantActionRecord) -> dict[str, Any]:
@@ -140,3 +184,12 @@ def _record_from_dict(item: dict[str, Any]) -> HomeAssistantActionRecord:
         },
         new_states={str(key): str(value) for key, value in new_states.items()},
     )
+
+
+def _is_simple_state_change(service_call: dict[str, Any]) -> bool:
+    if service_call.get("service") not in {"toggle", "turn_off", "turn_on"}:
+        return False
+    data = service_call.get("data", {})
+    if not isinstance(data, dict):
+        return False
+    return not (set(data) - {"entity_id"})

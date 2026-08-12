@@ -18,6 +18,8 @@ export KIRA_HA_LIVE_EVENTS_PATH=/data/homeassistant/live_events.json
 export KIRA_HA_EVENT_FILTERS_PATH=/data/config/ha_event_filters.yaml
 export KIRA_HA_PERMISSIONS_PATH=/data/config/ha_permissions.yaml
 export KIRA_HA_ACTION_LOG_PATH=/data/homeassistant/action_log.json
+export KIRA_AGENT_CONTEXT_PATH=/data/homeassistant/conversation_contexts.json
+export KIRA_AGENT_WORKFLOWS_PATH=/data/config/agent_workflows.yaml
 export KIRA_PROFILE_PATH=/data/profile.json
 export KIRA_TELEMETRY_PATH=/data/telemetry.json
 export KIRA_OPENART_DIR=/data/openart
@@ -58,7 +60,13 @@ from pathlib import Path
 options_path = Path("/data/options.json")
 settings_path = Path(os.environ["KIRA_AUDIO_SETTINGS_PATH"])
 if options_path.exists() and not settings_path.exists():
-    options = json.loads(options_path.read_text(encoding="utf-8"))
+    try:
+        options = json.loads(options_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"[WARN] Audio-Optionen konnten nicht gelesen werden: {exc}")
+        options = {}
+    if not isinstance(options, dict):
+        options = {}
     media_player = options.get("default_media_player") or None
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(

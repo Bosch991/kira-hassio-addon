@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,6 +32,30 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
+    agent_semantic_enabled: bool = Field(
+        default=True,
+        alias="KIRA_AGENT_SEMANTIC_ENABLED",
+    )
+    agent_confirmation_seconds: int = Field(
+        default=120,
+        alias="KIRA_AGENT_CONFIRMATION_SECONDS",
+    )
+    agent_verification_attempts: int = Field(
+        default=2,
+        alias="KIRA_AGENT_VERIFICATION_ATTEMPTS",
+    )
+    agent_verification_delay: float = Field(
+        default=0.25,
+        alias="KIRA_AGENT_VERIFICATION_DELAY",
+    )
+    proactive_mode: Literal["detect", "suggest", "execute"] = Field(
+        default="detect",
+        alias="KIRA_PROACTIVE_MODE",
+    )
+    proactive_auto_execute: bool = Field(
+        default=False,
+        alias="KIRA_PROACTIVE_AUTO_EXECUTE",
+    )
     stt_provider: str = Field(default="openai", alias="STT_PROVIDER")
     stt_model: str = Field(default="whisper-1", alias="STT_MODEL")
     homeassistant_url: str | None = Field(default=None, alias="HOMEASSISTANT_URL")
@@ -128,6 +153,14 @@ class Settings(BaseSettings):
         default=None,
         alias="KIRA_HA_ACTION_LOG_PATH",
     )
+    agent_context_path: Path | None = Field(
+        default=None,
+        alias="KIRA_AGENT_CONTEXT_PATH",
+    )
+    agent_workflows_path: Path | None = Field(
+        default=None,
+        alias="KIRA_AGENT_WORKFLOWS_PATH",
+    )
     profile_path: Path | None = Field(default=None, alias="KIRA_PROFILE_PATH")
     telemetry_path: Path | None = Field(default=None, alias="KIRA_TELEMETRY_PATH")
     openart_dir: Path | None = Field(default=None, alias="KIRA_OPENART_DIR")
@@ -177,6 +210,12 @@ class Settings(BaseSettings):
             self.ha_action_log_path = (
                 self.data_dir / "homeassistant" / "action_log.json"
             )
+        if self.agent_context_path is None:
+            self.agent_context_path = (
+                self.data_dir / "homeassistant" / "conversation_contexts.json"
+            )
+        if self.agent_workflows_path is None:
+            self.agent_workflows_path = self.config_dir / "agent_workflows.yaml"
         if self.profile_path is None:
             self.profile_path = self.data_dir / "profile.json"
         if self.telemetry_path is None:

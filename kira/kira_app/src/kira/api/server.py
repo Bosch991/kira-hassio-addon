@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 import time
 from typing import Any
 
@@ -17,6 +18,12 @@ class ChatRequest(BaseModel):
     """Request body for POST /chat."""
 
     message: str
+    user: str = "api-user"
+    source: str = "api"
+    conversation_id: str | None = None
+    device_id: str | None = None
+    area_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ChatResponse(BaseModel):
@@ -84,7 +91,7 @@ def create_api(app: KiraApplication) -> Any:
                 detail="KIRA_API_TOKEN is not configured.",
             )
         scheme, _, token = (authorization or "").partition(" ")
-        if scheme.lower() != "bearer" or token != expected:
+        if scheme.lower() != "bearer" or not secrets.compare_digest(token, expected):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid bearer token.",
@@ -160,7 +167,7 @@ def create_api(app: KiraApplication) -> Any:
             message=check_result.message,
         )
 
-    @api.post("/updates/pull")
+    @api.post("/updates/pull", dependencies=[Depends(require_bearer)])
     def updates_pull() -> UpdateResponse:
         result = app.update_service.pull_updates()
         status_result = app.update_service.local_status()
@@ -174,7 +181,7 @@ def create_api(app: KiraApplication) -> Any:
             message=result.message,
         )
 
-    @api.post("/updates/restart")
+    @api.post("/updates/restart", dependencies=[Depends(require_bearer)])
     def updates_restart() -> UpdateResponse:
         status_result = app.update_service.local_status()
         return UpdateResponse(
@@ -191,7 +198,17 @@ def create_api(app: KiraApplication) -> Any:
     def chat(request: ChatRequest) -> ChatResponse:
         started = time.perf_counter()
         session = ChatSession.from_app(app)
-        response = session.handle_message(request.message)
+        response = session.handle_assist_message(
+            request.message,
+            context={
+                "user": request.user,
+                "source": request.source,
+                "conversation_id": request.conversation_id,
+                "device_id": request.device_id,
+                "area_id": request.area_id,
+                "metadata": request.metadata,
+            },
+        )
         app.telemetry.record_response_time("api.chat", time.perf_counter() - started)
         return ChatResponse(response=response)
 
@@ -202,6 +219,8 @@ def create_api(app: KiraApplication) -> Any:
         response = session.handle_assist_message(
             request.text,
             context={
+                "user": request.user,
+                "source": request.source,
                 "device_id": request.device_id,
                 "conversation_id": request.conversation_id,
                 "agent_id": request.agent_id,

@@ -4,9 +4,21 @@ Dieses Add-on startet Kira komplett auf Home Assistant OS. Der Windows-Rechner
 muss fuer Assist, Home-Assistant-Steuerung, Memory, Knowledge und
 `media_player`-Ausgabe nicht mehr laufen.
 
+## Kira 2.0
+
+Natuerliche Anfragen aus Home Assistant Assist laufen ueber Kiras
+kontextbewussten Agenten. Kira liest aktuelle States, loest Raum und Geraet
+dynamisch auf, bevorzugt vorhandene Scenes/Scripts/Automationen und prueft den
+erreichten Zustand nach einer Aktion erneut.
+
 ## Wichtige Optionen
 
-- `openai_api_key`: erforderlich fuer freie Gesprae.
+- `openai_api_key`: erforderlich fuer freie Gespraeche und semantische Intents.
+- `agent_semantic_enabled`: OpenAI-Interpretation mit lokalem Fallback.
+- `agent_confirmation_seconds`: Ablaufzeit sicherheitsrelevanter Plaene.
+- `agent_verification_attempts`: begrenzte State-Pruefungen nach Aktionen.
+- `proactive_mode`: standardmaessig nur `detect`.
+- `proactive_auto_execute`: sicherer Standard ist `false`.
 - `kira_api_token`: Token, das die Kira Assist Custom Integration nutzt.
 - `default_media_player`: optionales Standard-Ausgabegeraet.
 - `media_base_url`: z. B. `http://<HA-IP>:8765`, wenn Kira TTS an
@@ -40,6 +52,7 @@ Kira speichert Daten unter `/data`:
 - Knowledge
 - Plugin-Konfiguration
 - Home-Assistant-Aktionsprotokoll
+- Agenten-Kontext und ausstehende Bestaetigungsplaene
 - OpenArt-History
 - Voice-Dateien
 
