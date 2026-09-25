@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kira-assistant"
-version = "2.1.0"
+version = "2.2.0"
 description = "Local-first personal AI assistant foundation."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -30,7 +30,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "black==26.3.1",
-  "httpx2==2.10.0",
+  "httpx2==2.12.0",
   "pip-audit==2.10.1",
   "pytest==9.0.3",
   "ruff==0.12.2",

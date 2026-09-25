@@ -1,5 +1,16 @@
 # Roadmap
 
+## 2.2.0 Zuverlaessige Aufgabenverwaltung
+
+- Aufgabenliste, Verlauf, Details und gezielter Abbruch ueber Chat und Assist
+- lokale Verwaltung ohne HA-Verbindung oder LLM-Aufruf
+- Benutzer-/Kanalgrenzen und gemeinsamer lokaler Desktop-/CLI-Kontext
+- atomare Statuswechsel gegen doppelte Ausfuehrung und Abbruch-Rennen
+- offene Aufgaben bleiben bei vollem Speicher erhalten
+- frischer Triggerzustand verhindert Aktionen durch veraltete Ereignisse
+- keine vollstaendigen HA-Abfragen fuer unpassende Task-Ereignisse
+- Laufzeitfehler werden als Ergebnis gespeichert und nicht blind wiederholt
+
 ## 2.1.0 Kontextuelle Intelligenz
 
 - semantischer `SituationContext` statt ungefilterter Home-Assistant-States

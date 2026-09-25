@@ -277,6 +277,9 @@ class ChatSession:
                 if parsed.command is ChatCommand.STATS:
                     self._show_stats()
                     continue
+                if parsed.command is ChatCommand.TASKS:
+                    self._handle_tasks(parsed.text)
+                    continue
                 if parsed.command is ChatCommand.SAY:
                     self._say(parsed.text)
                     continue
@@ -322,7 +325,8 @@ class ChatSession:
     def _show_help(self) -> None:
         self._respond(
             "Verfuegbare Kommandos: /about, /help, /memory, /projects, "
-            "/reload, /stats, /ha ..., /audio ..., /media server ..., "
+            "/reload, /stats, /tasks [list|all], /tasks show|cancel <ID>, "
+            "/ha ..., /audio ..., /media server ..., "
             "/plugins, /plugin info <name>, /plugin enable <name>, "
             "/plugin disable <name>, /plugin reload <name|all>, "
             "/plugin health, /backup, /export [path], /import <path>, "
@@ -351,7 +355,14 @@ class ChatSession:
         """Handle terminal-style input, including slash commands, and return output."""
         parsed = parse_input(raw_input)
         if parsed.command is ChatCommand.MESSAGE:
-            return self.handle_assist_message(parsed.text)
+            return self.handle_assist_message(
+                parsed.text,
+                context={
+                    "conversation_id": "local-chat",
+                    "user": "local-user",
+                    "source": "chat",
+                },
+            )
 
         if self.session_log is not None:
             self._write_session_line("user", raw_input)
@@ -396,6 +407,8 @@ class ChatSession:
             self._remember(parsed.text)
         elif parsed.command is ChatCommand.STATS:
             self._show_stats()
+        elif parsed.command is ChatCommand.TASKS:
+            self._handle_tasks(parsed.text)
         elif parsed.command is ChatCommand.SAY:
             self._say(parsed.text)
         elif parsed.command is ChatCommand.SERVER:
@@ -416,6 +429,22 @@ class ChatSession:
             self._respond("Diesen Befehl kenne ich noch nicht. Nutze /help fuer Hilfe.")
 
         return self.last_response or ""
+
+    def _handle_tasks(self, arguments: str) -> None:
+        if self.homeassistant_agent is None:
+            self._respond("Die Aufgabenverwaltung ist nicht verfuegbar.")
+            return
+        result = self.homeassistant_agent.handle(
+            f"/tasks {arguments}".strip(),
+            AgentRequestContext(
+                conversation_id="local-chat", user="local-user", source="chat"
+            ),
+        )
+        self._respond(
+            result.response
+            if result.handled
+            else "Die Aufgabenverwaltung ist nicht verfuegbar."
+        )
 
     def handle_assist_message(
         self,

@@ -29,6 +29,7 @@ class ChatCommand(StrEnum):
     RELOAD = "reload"
     REMEMBER = "remember"
     STATS = "stats"
+    TASKS = "tasks"
     SAY = "say"
     SERVER = "server"
     SPEAK = "speak"
@@ -55,6 +56,9 @@ def parse_input(raw_input: str) -> ParsedInput:
         return ParsedInput(ChatCommand.MESSAGE)
 
     lowered = value.lower()
+    parts = value.split(maxsplit=1)
+    if parts[0].lower() == "/tasks":
+        return ParsedInput(ChatCommand.TASKS, parts[1] if len(parts) > 1 else "")
     if lowered == "/exit":
         return ParsedInput(ChatCommand.EXIT)
     if lowered == "/about":

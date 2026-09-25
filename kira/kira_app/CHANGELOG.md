@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.2.0 - Zuverlaessige Aufgabenverwaltung
+
+- `/tasks [list|all] [Seite]`, `/tasks show <ID>` und `/tasks cancel <ID>`
+- lokale Antworten auf Aufgabenfragen in Terminal, Desktop und Assist/API
+- Benutzer-/Kanalgrenzen, eindeutige Kurz-IDs und verstaendliche Ergebnisse
+- atomare Claims und Statuswechsel verhindern doppelte Ausfuehrung und
+  Wiederaktivierung abgebrochener Aufgaben
+- Speicherlimit verwirft nur abgeschlossene Historie; offene Aufgaben bleiben erhalten
+- ignoriert unpassende und reine Attribut-Events ohne vollstaendigen HA-State-Abruf
+- veraltete Trigger werden gegen frische States geprueft
+- unerwartete Laufzeitfehler werden gespeichert; geaenderte Plaene verlangen
+  einen neu formulierten Auftrag statt einer nicht erreichbaren Bestaetigung
+- Desktop und Terminal verwenden denselben lokalen Aufgabenkontext
+- Entwicklungsabhaengigkeit httpx2 auf 2.12.0 aktualisiert (Audit-Befunde
+  PYSEC-2026-3846, PYSEC-2026-3848, PYSEC-2026-3849);
+  [Release-Details](https://pypi.org/project/httpx2/2.12.0/)
+
 ## 2.1.0 - Kontextuelle Intelligenz
 
 - kompakter SituationContext fuer Praesenz, Activities, Raeume, Geraete,

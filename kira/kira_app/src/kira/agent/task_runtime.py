@@ -21,6 +21,7 @@ from kira.agent.models import (
 )
 from kira.agent.planning import HomeAssistantPlanner
 from kira.agent.safety import PlanSafetyManager
+from kira.agent.task_store import TaskCapacityError
 from kira.agent.tasks import (
     AgentTask,
     TaskActionKind,
@@ -85,6 +86,23 @@ class TaskService:
         catalog: EntityCatalog,
     ) -> TaskCreationResult:
         """Parse, preview-plan, safety-review, and persist a task."""
+        try:
+            return self._create(message, context, catalog)
+        except TaskCapacityError:
+            return TaskCreationResult(
+                True,
+                "Der Aufgabenspeicher ist mit offenen Aufgaben belegt. "
+                "Pruefe /tasks und brich nicht mehr benoetigte Aufgaben ab. "
+                "Die neue Aufgabe wurde nicht gespeichert.",
+            )
+
+    def _create(
+        self,
+        message: str,
+        context: ConversationContext,
+        catalog: EntityCatalog,
+    ) -> TaskCreationResult:
+        """Create one task without silently evicting existing user requests."""
         parsed = self.parser.parse(message, context, catalog)
         draft = parsed.draft
         if draft is None:
@@ -315,6 +333,8 @@ class TaskRunner:
 
     def handle_event(self, event: HomeAssistantLiveEvent) -> list[TaskRunResult]:
         """Handle one normalized live event; websocket access stays read-only."""
+        if not self.manager.may_match_event(event):
+            return []
         snapshot = self.world.refresh()
         if snapshot is None or not self.world.last_refresh_ok:
             return []
@@ -324,7 +344,19 @@ class TaskRunner:
             claimed = self.manager.mark_running(task.id)
             if claimed is None:
                 continue
-            results.append(self._run(claimed, catalog))
+            try:
+                results.append(self._run(claimed, catalog))
+            except Exception:
+                self.logger.exception("Conditional task execution failed: %s", task.id)
+                self.manager.fail(task.id, "execution_interrupted")
+                results.append(
+                    TaskRunResult(
+                        task.id,
+                        TaskStatus.FAILED,
+                        "Die Ausfuehrung wurde unterbrochen. Bitte pruefe das Geraet; "
+                        "ich wiederhole die Aktion nicht automatisch.",
+                    )
+                )
         return results
 
     def _worker(self) -> None:
@@ -346,6 +378,13 @@ class TaskRunner:
         action = task.actions[0]
         if action.kind is TaskActionKind.NOTIFY:
             message = f"Task ausgeloest: {task.trigger.description}"
+            if self.notifier is None:
+                self.manager.fail(task.id, "notification_unavailable")
+                return TaskRunResult(
+                    task.id,
+                    TaskStatus.FAILED,
+                    "Kein Benachrichtigungskanal verfuegbar.",
+                )
             if self.notifier is not None:
                 try:
                     self.notifier(task, message)
@@ -387,21 +426,23 @@ class TaskRunner:
                 "Die Laufzeit-Sicherheitspruefung hat die Aktion blockiert.",
             )
         if not self._within_authorization(task, plan):
-            self.manager.defer_confirmation(task.id, "runtime_plan_changed")
+            self.manager.fail(task.id, "runtime_plan_changed")
             return TaskRunResult(
                 task.id,
-                TaskStatus.PENDING_CONFIRMATION,
-                "Der Laufzeitplan hat sich geaendert und braucht neue Bestaetigung.",
+                TaskStatus.FAILED,
+                "Der Laufzeitplan hat sich geaendert. Bitte formuliere den Auftrag "
+                "neu, damit ich ihn erneut pruefen kann.",
             )
         if (
             review.decision is PermissionDecision.REQUIRE_CONFIRM
             and task.confirmed_at is None
         ):
-            self.manager.defer_confirmation(task.id, "runtime_confirmation_required")
+            self.manager.fail(task.id, "runtime_confirmation_required")
             return TaskRunResult(
                 task.id,
-                TaskStatus.PENDING_CONFIRMATION,
-                "Die Aktion braucht vor der Ausfuehrung eine Bestaetigung.",
+                TaskStatus.FAILED,
+                "Die Aktion braucht jetzt eine Bestaetigung. Bitte formuliere "
+                "den Auftrag erneut.",
             )
         execution = self.executor.execute(plan, catalog, user_text=task.request_text)
         if execution.ok:

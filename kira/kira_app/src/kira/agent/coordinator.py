@@ -42,6 +42,8 @@ from kira.agent.responses import (
 )
 from kira.agent.safety import PlanSafetyManager
 from kira.agent.situation import SituationAnalyzer, SituationContext
+from kira.agent.task_commands import TaskCommandHandler
+from kira.agent.task_models import TaskStatus
 from kira.agent.task_runtime import TaskService
 from kira.homeassistant.permissions import PermissionDecision
 from kira.homeassistant.world_model import (
@@ -115,6 +117,11 @@ class HomeAssistantAgent:
             else None
         )
         self.task_service = task_service
+        self.task_commands = (
+            TaskCommandHandler(task_service.manager)
+            if task_service is not None
+            else None
+        )
         self.proactive_engine = proactive_engine
         self.proactive_policy = proactive_policy
         self.proactive_sink = proactive_sink
@@ -142,6 +149,19 @@ class HomeAssistantAgent:
     ) -> AgentResponse:
         """Handle one request or decline free conversation cleanly."""
         context = self.contexts.get(request)
+        if self.task_commands is not None:
+            task_answer = self.task_commands.handle(
+                message, request, conversation_id=context.conversation_id
+            )
+            if task_answer is not None:
+                if context.pending_task_id is not None:
+                    pending = self.task_commands.manager.get(context.pending_task_id)
+                    if (
+                        pending is None
+                        or pending.status is not TaskStatus.PENDING_CONFIRMATION
+                    ):
+                        self.contexts.clear_pending_task(context)
+                return AgentResponse(handled=True, response=task_answer)
         snapshot = self.world.snapshot
         catalog = (
             EntityCatalog.from_snapshot(snapshot)
@@ -189,12 +209,26 @@ class HomeAssistantAgent:
                     intent,
                 )
             if context.pending_task_id is not None and self.task_service is not None:
+                if (
+                    request.user != context.pending_task_user
+                    or request.source != context.pending_task_source
+                ):
+                    return AgentResponse(
+                        True,
+                        "Diese Aufgabe gehoert zu einem anderen Anfragekontext.",
+                        intent,
+                    )
                 task_id = context.pending_task_id
-                self.task_service.cancel(task_id)
+                cancelled = self.task_service.cancel(task_id)
                 self.contexts.clear_pending_task(context)
                 return AgentResponse(
                     handled=True,
-                    response="Okay, die ausstehende Aufgabe ist verworfen.",
+                    response=(
+                        "Okay, die ausstehende Aufgabe ist verworfen."
+                        if cancelled is not None
+                        else "Die Aufgabe wartet nicht mehr auf Bestaetigung. "
+                        "Pruefe ihren Status mit /tasks all."
+                    ),
                     intent=intent,
                     task_id=task_id,
                 )

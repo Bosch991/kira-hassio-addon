@@ -1,11 +1,24 @@
 # Kira
 
-Kira `2.1.0` ist eine lokale, modulare Assistenten-Plattform. Terminal-Chat,
+Kira `2.2.0` ist eine lokale, modulare Assistenten-Plattform. Terminal-Chat,
 Desktop-App, OpenAI-Fallback, Home Assistant, Voice, Audio-Routing, Memory,
 Knowledge, Live-Events, Plugins, API und Backup bleiben erhalten. Neu ist ein
 kontextbewusster Home-Assistant-Agent: Er versteht freie Absichten, loest
 Ziele gegen den aktuellen Hauszustand auf, plant mehrere Schritte, prueft
 Sicherheit und Faehigkeiten und bestaetigt Ergebnisse durch erneutes Lesen.
+Version `2.2.0` macht bedingte Aufgaben nachvollziehbar und verwaltbar:
+
+- `/tasks`: offene Aufgaben mit ID und Status
+- `/tasks all`: Verlauf, bei Bedarf mit Seitenzahl, z. B. `/tasks all 2`
+- `/tasks show <ID>`: Auftrag, Ausloeser, Bedingungen und Ergebnis
+- `/tasks cancel <ID>`: eine wartende Aufgabe abbrechen
+- natuerlich fragen: `Welche Aufgaben sind noch offen?` oder `Zeig meine Aufgaben.`
+
+Die ersten acht Zeichen einer eindeutigen ID reichen. Die Verwaltung funktioniert
+auch bei nicht erreichbarem Home Assistant. Aufgaben sind an Benutzer und
+Anfragekanal gebunden; lokale Desktop- und Terminal-Eingaben teilen denselben
+Kontext. Details, Grenzen und Beispiele: [Aufgaben](docs/tasks.md).
+
 Die kontextuelle Intelligenzstufe `2.1.0` ergaenzt ein kompaktes
 Situationsmodell, Activities mit Confidence, konfigurierbare Goals samt
 Completion Check, explizite Praeferenzen, Registry-Beziehungen, persistente

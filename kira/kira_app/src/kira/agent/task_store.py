@@ -22,6 +22,14 @@ from kira.agent.task_models import (
 from kira.homeassistant.events import HomeAssistantLiveEvent
 from kira.homeassistant.permissions import PermissionDecision, RiskLevel
 
+OPEN_TASK_STATUSES = frozenset(
+    {TaskStatus.ACTIVE, TaskStatus.PENDING_CONFIRMATION, TaskStatus.RUNNING}
+)
+
+
+class TaskCapacityError(ValueError):
+    """Raised when another task would evict an unfinished user request."""
+
 
 class TaskManager:
     """Persist tasks and match active triggers without executing actions."""
@@ -51,14 +59,8 @@ class TaskManager:
                     task.status = TaskStatus.FAILED
                     task.last_result = "interrupted_during_execution"
                     task.updated_at = now
-                elif (
-                    task.status is TaskStatus.PENDING_CONFIRMATION
-                    and task.confirmation_expires_at is not None
-                    and now > task.confirmation_expires_at
-                ):
-                    task.status = TaskStatus.EXPIRED
-                    task.last_result = "confirmation_expired"
-                    task.updated_at = now
+                else:
+                    self._expire(task, now)
 
         self._store.update(recover)
 
@@ -102,12 +104,27 @@ class TaskManager:
         )
 
         def mutate(document: TaskDocument) -> None:
-            document.tasks.append(task)
-            document.tasks = sorted(
-                document.tasks,
+            for item in document.tasks:
+                self._expire(item, utc_now())
+            unfinished = [
+                item for item in document.tasks if item.status in OPEN_TASK_STATUSES
+            ]
+            if len(unfinished) >= self.limit:
+                raise TaskCapacityError("Task storage is full of unfinished tasks")
+            history = sorted(
+                (
+                    item
+                    for item in document.tasks
+                    if item.status not in OPEN_TASK_STATUSES
+                ),
                 key=lambda item: item.updated_at,
                 reverse=True,
-            )[: self.limit]
+            )
+            document.tasks = [
+                *unfinished,
+                *history[: self.limit - len(unfinished) - 1],
+            ]
+            document.tasks.append(task)
 
         self._store.update(mutate)
         return task.model_copy(deep=True)
@@ -115,7 +132,7 @@ class TaskManager:
     def get(self, task_id: str) -> AgentTask | None:
         """Return one task by ID."""
         return next(
-            (item for item in self._store.read().tasks if item.id == task_id),
+            (item for item in self.list() if item.id == task_id),
             None,
         )
 
@@ -127,6 +144,14 @@ class TaskManager:
     ) -> list[AgentTask]:
         """Return tasks newest first with optional filters."""
         tasks = self._store.read().tasks
+        now = utc_now()
+        if any(self._expire(item, now) for item in tasks):
+
+            def expire(document: TaskDocument) -> None:
+                for item in document.tasks:
+                    self._expire(item, now)
+
+            tasks = self._store.update(expire).tasks
         if statuses is not None:
             tasks = [item for item in tasks if item.status in statuses]
         if user is not None:
@@ -135,22 +160,10 @@ class TaskManager:
 
     def activate(self, task_id: str) -> AgentTask | None:
         """Activate a task after explicit confirmation."""
-        task = self.get(task_id)
-        if task is None or task.status is not TaskStatus.PENDING_CONFIRMATION:
-            return None
-        if (
-            task.confirmation_expires_at is not None
-            and utc_now() > task.confirmation_expires_at
-        ):
-            self._transition(
-                task_id,
-                status=TaskStatus.EXPIRED,
-                result="confirmation_expired",
-            )
-            return None
         return self._transition(
             task_id,
             status=TaskStatus.ACTIVE,
+            expected={TaskStatus.PENDING_CONFIRMATION},
             confirmed_at=utc_now(),
             result="explicitly_confirmed",
         )
@@ -160,27 +173,51 @@ class TaskManager:
         return self._transition(
             task_id,
             status=TaskStatus.CANCELLED,
+            expected={TaskStatus.ACTIVE, TaskStatus.PENDING_CONFIRMATION},
             result="cancelled_by_user",
         )
 
     def mark_running(self, task_id: str) -> AgentTask | None:
         """Claim a matched task before execution."""
-        return self._transition(task_id, status=TaskStatus.RUNNING, result="triggered")
+        return self._transition(
+            task_id,
+            status=TaskStatus.RUNNING,
+            expected={TaskStatus.ACTIVE},
+            result="triggered",
+        )
 
     def complete(self, task_id: str, result: str) -> AgentTask | None:
         """Mark a task completed."""
-        return self._transition(task_id, status=TaskStatus.COMPLETED, result=result)
+        return self._transition(
+            task_id,
+            status=TaskStatus.COMPLETED,
+            expected={TaskStatus.RUNNING},
+            result=result,
+        )
 
     def fail(self, task_id: str, result: str) -> AgentTask | None:
         """Mark a task failed."""
-        return self._transition(task_id, status=TaskStatus.FAILED, result=result)
+        return self._transition(
+            task_id,
+            status=TaskStatus.FAILED,
+            expected={TaskStatus.RUNNING},
+            result=result,
+        )
 
     def defer_confirmation(self, task_id: str, result: str) -> AgentTask | None:
         """Require a fresh confirmation after a material runtime plan change."""
         return self._transition(
             task_id,
             status=TaskStatus.PENDING_CONFIRMATION,
+            expected={TaskStatus.RUNNING},
             result=result,
+        )
+
+    def may_match_event(self, event: HomeAssistantLiveEvent) -> bool:
+        """Check trigger identity before requesting expensive live house states."""
+        return any(
+            self._trigger_matches(task.trigger, event)
+            for task in self.list(statuses={TaskStatus.ACTIVE})
         )
 
     def match_event(
@@ -198,11 +235,21 @@ class TaskManager:
                 self._transition(
                     task.id,
                     status=TaskStatus.EXPIRED,
+                    expected={TaskStatus.ACTIVE},
                     result="expiry_reached",
                 )
                 continue
             if not self._trigger_matches(task.trigger, event):
                 continue
+            if event.event_type == "state_changed":
+                current_entity = catalog.by_id.get(event.entity_id or "")
+                if (
+                    current_entity is None
+                    or not current_entity.available
+                    or normalize_text(current_entity.state)
+                    != normalize_text(event.new_state or "")
+                ):
+                    continue
             if not all(
                 self._condition_matches(item, catalog) for item in task.conditions
             ):
@@ -239,6 +286,7 @@ class TaskManager:
         task_id: str,
         *,
         status: TaskStatus,
+        expected: set[TaskStatus],
         result: str,
         confirmed_at: datetime | None = None,
     ) -> AgentTask | None:
@@ -249,6 +297,9 @@ class TaskManager:
             task = next((item for item in document.tasks if item.id == task_id), None)
             if task is None:
                 return
+            self._expire(task, utc_now())
+            if task.status not in expected:
+                return
             task.status = status
             task.last_result = result
             task.updated_at = utc_now()
@@ -258,6 +309,27 @@ class TaskManager:
 
         self._store.update(mutate)
         return updated
+
+    @staticmethod
+    def _expire(task: AgentTask, now: datetime) -> bool:
+        """Expire waiting tasks without changing historical or running outcomes."""
+        if task.status not in {TaskStatus.ACTIVE, TaskStatus.PENDING_CONFIRMATION}:
+            return False
+        reason = None
+        if task.expires_at is not None and now >= task.expires_at:
+            reason = "expiry_reached"
+        elif (
+            task.status is TaskStatus.PENDING_CONFIRMATION
+            and task.confirmation_expires_at is not None
+            and now >= task.confirmation_expires_at
+        ):
+            reason = "confirmation_expired"
+        if reason is None:
+            return False
+        task.status = TaskStatus.EXPIRED
+        task.last_result = reason
+        task.updated_at = now
+        return True
 
     def _trigger_matches(
         self,
@@ -270,6 +342,8 @@ class TaskManager:
             return False
         old_state = normalize_text(event.old_state or "")
         new_state = normalize_text(event.new_state or "")
+        if event.event_type == "state_changed" and old_state == new_state:
+            return False
         if trigger.from_states and old_state not in {
             normalize_text(item) for item in trigger.from_states
         }:

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.0
+
+- Aufgabenliste, Verlauf, Details und Abbruch per `/tasks` oder Aufgabenfrage
+- atomare Task-Ausfuehrung mit frischem Triggerzustand und Fehlerhistorie
+- offene Aufgaben bleiben bei vollem Speicher erhalten
+- weniger HA-REST-Abfragen bei unpassenden Live-Ereignissen
+- Benutzer- und Kanalgrenzen fuer Aufgabenverwaltung
+
 ## 2.1.0
 
 - SituationContext, Activities, Goals und Completion Checks
